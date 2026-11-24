@@ -62,8 +62,18 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-botto
 .evlog .ev .t{color:#8b98b2;font-variant-numeric:tabular-nums;flex:none}
 @media (max-width:900px){.liveread{grid-template-columns:1fr}}
 .toast{pointer-events:auto;position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:12px 40px 14px 14px;border-radius:12px;background:#0f1522;border:1px solid #334155;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:tin .45s cubic-bezier(.2,1.4,.4,1)}
-.toast.down{border-color:#ef4444;background:linear-gradient(120deg,#3b0d0d,#140c12 70%);box-shadow:0 0 28px rgba(239,68,68,.45),0 12px 40px rgba(0,0,0,.6)}
-.toast.up{border-color:#22c55e;background:linear-gradient(120deg,#0b3320,#0b1410 70%);box-shadow:0 0 28px rgba(34,197,94,.45),0 12px 40px rgba(0,0,0,.6)}
+/* red = liquidating DOWN (longs hit) · green = liquidating UP (shorts hit) */
+.toast.down{border:2px solid #f87171;background:linear-gradient(120deg,#b91c1c,#7f1d1d 55%,#450a0a);box-shadow:0 0 32px rgba(239,68,68,.6),0 12px 40px rgba(0,0,0,.6)}
+.toast.up{border:2px solid #4ade80;background:linear-gradient(120deg,#15803d,#14532d 55%,#052e16);box-shadow:0 0 32px rgba(34,197,94,.6),0 12px 40px rgba(0,0,0,.6)}
+.toast.test{border:2px solid #60a5fa;background:linear-gradient(120deg,#1d4ed8,#1e3a8a 55%,#172554);box-shadow:0 0 32px rgba(59,130,246,.5),0 12px 40px rgba(0,0,0,.6)}
+.toast.down .td,.toast.up .td,.toast.test .td{color:#f1f5f9}
+.toast.down .tm,.toast.up .tm,.toast.test .tm{color:rgba(255,255,255,.7)}
+.toast.down .side{background:#fff;color:#b91c1c}.toast.up .side{background:#fff;color:#15803d}.toast.test .side{background:#fff;color:#1d4ed8}
+.toast.down .ic,.toast.up .ic,.toast.test .ic{color:#fff;background:rgba(0,0,0,.25)}
+.toast.down .bar,.toast.up .bar,.toast.test .bar{color:#fff}
+.edge.test{box-shadow:inset 0 0 90px 10px rgba(59,130,246,.65)}
+.alertlog .al.test{color:#bfdbfe;background:#172554}
+.pill{background:#7c2d12;border-color:#ea580c;color:#ffedd5;font-weight:700;animation:fl 1.2s ease-in-out infinite}
 .toast.warn{border-color:#f5c542;background:linear-gradient(120deg,#3a2e08,#15120a 70%);box-shadow:0 0 28px rgba(245,197,66,.45),0 12px 40px rgba(0,0,0,.6)}
 .toast .ic{font-size:28px;line-height:1;width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.08);animation:icp 1s ease-in-out 3}
 .toast.down .ic{color:#f87171}.toast.up .ic{color:#4ade80}.toast.warn .ic{color:#fcd34d}
@@ -179,7 +189,10 @@ button:hover{background:#273449}
   <div id="statusDetail">Loading history…</div>
   <label class="chk"><input type="checkbox" id="sound"> sound alert</label>
   <label class="chk"><input type="checkbox" id="notify"> desktop notification</label>
+  <label class="chk"><input type="checkbox" id="vibrate"> vibrate (phone)</label>
+  <label class="chk"><input type="checkbox" id="wake"> keep screen on</label>
   <button id="btnTest">Test alert</button>
+  <button id="soundPill" class="pill" hidden>🔇 Tap here to enable sound</button>
   <div id="alertLog" class="alertlog"></div>
 </div>
 <div id="toasts" class="toasts"></div>
@@ -281,7 +294,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -1171,6 +1184,49 @@ function computeStatus(v) {
 }
 /* ---------- Alerts: sound, toast, edge glow, tab title, desktop notification, history ---------- */
 let actx = null;
+// Mobile browsers (Chrome Android, Safari iOS) only allow audio after a tap on the page.
+// After a reload the "sound alert" box is still ticked but audio is locked until the next tap,
+// so we unlock on the first touch/click anywhere and show a pill button while it is still locked.
+function unlockAudio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state !== 'running') {
+      actx.resume().catch(() => { });
+      const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource();   // silent blip completes the unlock on iOS
+      s.buffer = b; s.connect(actx.destination); s.start(0);
+    }
+  } catch (e) { }
+  setTimeout(updateSoundPill, 150);
+}
+function audioReady() { return !!actx && actx.state === 'running'; }
+function updateSoundPill() {
+  const pill = $('soundPill'); if (!pill) return;
+  pill.hidden = !(cfg.sound && !audioReady());
+}
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (cfg.sound && !audioReady()) unlockAudio(); }, { passive: true }));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (actx && actx.state !== 'running') actx.resume().catch(() => { }).finally(updateSoundPill);
+  if (cfg.wake) requestWake();
+});
+// Phone vibration (Android Chrome; iPhone does not support it). Red/down = long-short-long, green/up = three quick taps.
+const VIBE = { down: [260, 120, 260], up: [90, 60, 90, 60, 90], test: [150] };
+function vibrate(cls) {
+  if (!cfg.vibrate || !navigator.vibrate) return;
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;   // Chrome blocks vibration until the first tap
+  try { navigator.vibrate(VIBE[cls] || [150]); } catch (e) { }
+}
+// Keep the phone screen on while the panel is open (Screen Wake Lock API; needs https, works on GitHub Pages).
+let wakeLock = null;
+async function requestWake() {
+  try {
+    if (!('wakeLock' in navigator)) throw new Error('not supported by this browser');
+    if (wakeLock && !wakeLock.released) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) {
+    if (cfg.wake && !requestWake.warned) { requestWake.warned = true; showToast('test', 'Keep screen on unavailable', e.message || String(e)); }
+  }
+}
 // Each alert type is a "robot talk" phrase in a neutral range (≈250–560 Hz, nothing shrill).
 // Types differ by RHYTHM first, then by direction: falling = longs side / below, rising = shorts side / above.
 //   double tap  → real liquidations          staircase + wobble → model box swept
@@ -1184,11 +1240,11 @@ const ALERT_KINDS = {
   sweepUp:      { icon: '⬆', cls: 'up',   side: 'SHORTS LIQUIDITY SWEPT', buzz: .16, loud: 1, blips: [[0, 300, 300, .07, 0], [.1, 360, 360, .07, 0], [.2, 430, 430, .07, 0], [.3, 430, 560, .24, 1]] },
   grabDown:     { icon: '▼', cls: 'down', side: 'LONGS LIQUIDATED AT TARGET',  buzz: .3, loud: 1, blips: [[0, 540, 300, .2, 1], [.27, 540, 290, .3, 1]] },
   grabUp:       { icon: '▲', cls: 'up',   side: 'SHORTS LIQUIDATED AT TARGET', buzz: .3, loud: 1, blips: [[0, 300, 540, .2, 1], [.27, 300, 550, .3, 1]] },
-  takenDown:    { icon: '⚡', cls: 'warn', side: 'LONGS LIQUIDITY TAKEN',  buzz: .35, loud: .9, blips: [[0, 470, 470, .05, 0], [.07, 530, 530, .05, 0], [.14, 470, 470, .05, 0], [.21, 530, 530, .05, 0], [.28, 470, 470, .05, 0], [.36, 400, 290, .18, 0]] },
-  takenUp:      { icon: '⚡', cls: 'warn', side: 'SHORTS LIQUIDITY TAKEN', buzz: .35, loud: .9, blips: [[0, 470, 470, .05, 0], [.07, 530, 530, .05, 0], [.14, 470, 470, .05, 0], [.21, 530, 530, .05, 0], [.28, 470, 470, .05, 0], [.36, 400, 540, .18, 0]] },
+  takenDown:    { icon: '⚡', cls: 'down', side: 'LONGS LIQUIDITY TAKEN',  buzz: .35, loud: .9, blips: [[0, 470, 470, .05, 0], [.07, 530, 530, .05, 0], [.14, 470, 470, .05, 0], [.21, 530, 530, .05, 0], [.28, 470, 470, .05, 0], [.36, 400, 290, .18, 0]] },
+  takenUp:      { icon: '⚡', cls: 'up', side: 'SHORTS LIQUIDITY TAKEN', buzz: .35, loud: .9, blips: [[0, 470, 470, .05, 0], [.07, 530, 530, .05, 0], [.14, 470, 470, .05, 0], [.21, 530, 530, .05, 0], [.28, 470, 470, .05, 0], [.36, 400, 540, .18, 0]] },
   approachDown: { icon: '◎', cls: 'down', side: 'HEADING INTO LONGS LIQUIDITY',  buzz: 0, loud: .85, blips: [[0, 470, 360, .32, 0]] },
   approachUp:   { icon: '◎', cls: 'up',   side: 'HEADING INTO SHORTS LIQUIDITY', buzz: 0, loud: .85, blips: [[0, 360, 470, .32, 0]] },
-  test:         { icon: '🤖', cls: 'up',  side: 'TEST', buzz: .16, loud: 1, blips: [[0, 300, 300, .07, 0], [.1, 360, 360, .07, 0], [.2, 430, 430, .07, 0], [.3, 430, 560, .24, 1]] }
+  test:         { icon: '🤖', cls: 'test', side: 'TEST', buzz: .16, loud: 1, blips: [[0, 300, 300, .07, 0], [.1, 360, 360, .07, 0], [.2, 430, 430, .07, 0], [.3, 430, 560, .24, 1]] }
 };
 function alertKind(k) {
   if (k.startsWith('LIQUIDITY GRAB BELOW')) return 'grabDown';
@@ -1203,7 +1259,7 @@ function playAlert(kind) {
   const A = ALERT_KINDS[kind]; if (!A) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    if (actx.state === 'suspended') actx.resume();
+    if (actx.state !== 'running') { try { actx.resume().catch(() => { }); } catch (e) { } }
     const t0 = actx.currentTime + 0.02;
     // chain: blips → master → low-pass (removes harsh highs) → compressor → out, plus a tiny metallic slap-back
     const master = actx.createGain(); master.gain.value = 0.5 * A.loud;
@@ -1288,6 +1344,7 @@ function fireAlert(kind, title, detail, opts) {
   S.lastAlertAt[kind] = now;
   const A = ALERT_KINDS[kind];
   playAlert(kind);
+  vibrate(A.cls);
   showToast(kind, title, detail);
   if (opts.glow !== false) edgeGlow(A.cls);
   flashTitle(A.icon + ' ' + A.side + ' · ETH $' + fmtPx(S.price, 0));
@@ -1551,6 +1608,8 @@ function fillCfgForm() {
   $('cfgCap').value = cfg.capDist; $('cfgApp').value = cfg.appDist; $('cfgW').value = cfg.weights.join('/');
   $('sound').checked = !!cfg.sound;
   $('notify').checked = !!cfg.notify;
+  $('vibrate').checked = !!cfg.vibrate; $('wake').checked = !!cfg.wake;
+  updateSoundPill();
   $('cfgBurst').value = cfg.burstMin; $('cfgSweep').value = cfg.sweepMin;
   $('optRange').value = String(cfg.optRange);
 }
@@ -1558,7 +1617,14 @@ function bindUI() {
   fillCfgForm(); buildLegends(); bindTips();
   $('sound').addEventListener('change', e => {
     cfg.sound = e.target.checked; saveCfg();
-    if (cfg.sound) { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (er) { } playAlert('test'); }
+    if (cfg.sound) { unlockAudio(); playAlert('test'); }
+    updateSoundPill();
+  });
+  $('soundPill').addEventListener('click', () => { unlockAudio(); playAlert('approachUp'); });
+  $('vibrate').addEventListener('change', e => { cfg.vibrate = e.target.checked; saveCfg(); if (cfg.vibrate) vibrate('test'); });
+  $('wake').addEventListener('change', e => {
+    cfg.wake = e.target.checked; saveCfg();
+    if (cfg.wake) { requestWake.warned = false; requestWake(); } else if (wakeLock) { wakeLock.release().catch(() => { }); wakeLock = null; }
   });
   $('notify').addEventListener('change', async e => {
     cfg.notify = e.target.checked; saveCfg();
@@ -1656,6 +1722,8 @@ function startDemo() {
 /* ================= Start ================= */
 async function init() {
   bindUI();
+  if (cfg.wake) requestWake();
+  setInterval(updateSoundPill, 2000);
   let demo = false;
   try { demo = new URLSearchParams(location.search).has('demo'); } catch (e) { }
   if (demo) { startDemo(); return; }
