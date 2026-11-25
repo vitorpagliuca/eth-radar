@@ -52,6 +52,33 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-botto
 .toast .side{font-size:11px;font-weight:800;letter-spacing:1.2px;display:inline-block;padding:1px 7px;border-radius:4px;margin-bottom:3px}
 .toast.down .side{background:#ef4444;color:#fff}.toast.up .side{background:#22c55e;color:#04210f}.toast.warn .side{background:#f5c542;color:#2a2000}
 .toast .tm{font-size:11px;color:#94a3b8;margin-top:3px;font-variant-numeric:tabular-nums}
+.setup-sig{font-size:20px;font-weight:800;letter-spacing:.5px;padding:8px 12px;border-radius:8px;margin:8px 0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+.setup-sig small{font-size:12px;font-weight:500;color:#cbd5e1;letter-spacing:0}
+.setup-sig.neutral{background:#1f2937;color:#cbd5e1}.setup-sig.up{background:#14532d;color:#bbf7d0;border:1px solid #22c55e}
+.setup-sig.down{background:#7f1d1d;color:#fecaca;border:1px solid #ef4444}.setup-sig.warn{background:#3d3210;color:#fde68a;border:1px solid #f5c542}
+.setup-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.setup-cols h3{font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.6px}
+.ck-list{list-style:none;margin:0;padding:0;font-size:12.5px}
+.ck-list li{display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid #1d2638;color:#8b98b2}
+.ck-list li.ok{color:#e1e7f2}.ck-list .ck{width:14px;flex:none;color:#475569}.ck-list li.ok .ck{color:#4ade80}
+.ck-list .vv{margin-left:auto;font-variant-numeric:tabular-nums;color:#94a3b8;white-space:nowrap;padding-left:8px}
+.setup-ref,.setup-bt{font-size:12.5px;margin-top:8px;color:#cbd5e1}.setup-bt{color:#8b98b2;font-size:11.5px}
+.rsi-c .arr{font-size:12px;margin-left:4px;vertical-align:3px}
+.rsi-c.lo{box-shadow:inset 0 0 0 1px #3b82f6}.rsi-c.hi{box-shadow:inset 0 0 0 1px #fb923c}
+.gauge{position:relative;height:6px;border-radius:3px;margin:6px 4px 4px;background:linear-gradient(90deg,#ef4444 0 25%,#f59e0b 25% 30%,#334155 30% 70%,#f59e0b 70% 75%,#ef4444 75%)}
+.gauge .dt{position:absolute;top:-3px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#f8fafc;border:2px solid #0b1220}
+.gauge .mk{position:absolute;top:-2px;width:2px;height:10px;margin-left:-1px;background:#94a3b8}
+.rsiif{margin-top:4px;color:#94a3b8}.rsiif b.lo,.insp-l b.lo{color:#60a5fa}.rsiif b.hi,.insp-l b.hi{color:#fb923c}
+.insp-h{font-size:13.5px;margin-bottom:8px}
+.insp-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.insp-g>div{background:var(--panel2);border-radius:8px;padding:8px 10px}
+.insp-g .t{font-size:11px;color:var(--muted)}.insp-g .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}.insp-g .s{font-size:11px;color:var(--muted)}
+.insp-g .hz{display:inline-block;font-size:12.5px;font-weight:500;margin-right:8px}
+.insp-l{font-size:12.5px;margin-top:8px}.insp-l.casc{color:#fdba74}
+.warnc{color:#fbbf24}
+table.rank td{vertical-align:middle}table.rank .rk{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#334155;font-size:11px;font-weight:700}
+table.rank tr.rk-dn td:first-child{border-left:3px solid #ef4444}table.rank tr.rk-up td:first-child{border-left:3px solid #22c55e}
+@media (max-width:760px){.setup-cols{grid-template-columns:1fr}}
 .liveread{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:10px}
 .liveread h3{font-size:12.5px;margin:0 0 6px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.6px}
 .liveread ul{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
@@ -187,7 +214,8 @@ button:hover{background:#273449}
 <div class="statusbar">
   <div id="status" class="status neutral">NEUTRAL</div>
   <div id="statusDetail">Loading history…</div>
-  <label class="chk"><input type="checkbox" id="sound"> sound alert</label>
+  <label class="chk"><input type="checkbox" id="sound"> sound (cascades only)</label>
+  <label class="chk"><input type="checkbox" id="soundAll"> sound on every alert</label>
   <label class="chk"><input type="checkbox" id="notify"> desktop notification</label>
   <label class="chk"><input type="checkbox" id="vibrate"> vibrate (phone)</label>
   <label class="chk"><input type="checkbox" id="wake"> keep screen on</label>
@@ -198,12 +226,18 @@ button:hover{background:#273449}
 <div id="toasts" class="toasts"></div>
 <div id="edgeGlow" class="edge"></div>
 
+<section class="card setup">
+  <div class="hhead"><h2>15-min setup · long or short</h2><span class="d">rule checklist on the 15-min candle + liquidity context · not investment advice</span></div>
+  <div id="setupHead" class="setup-sig neutral">Waiting for data…</div>
+  <div id="setupBody"></div>
+</section>
+
 <section class="row top">
   <div class="card"><h2>RSI 14 (Wilder)</h2><div class="rsigrid" id="rsigrid"></div></div>
   <div class="card note"><h2>Automatic reading</h2><ul id="notes"><li>Waiting for data…</li></ul></div>
   <div class="card book"><h2>Hyperliquid book (largest level)</h2>
-    <div class="blk ask"><div class="t">Sell wall (largest ask)</div><div class="p" id="venda">—</div><div class="t" id="vendaUsd"></div></div>
-    <div class="blk bid"><div class="t">Support (largest bid)</div><div class="p" id="apoio">—</div><div class="t" id="apoioUsd"></div></div>
+    <div class="blk ask"><div class="t">Sell wall (largest ask)</div><div class="p" id="venda">—</div><div class="t" id="vendaUsd"></div><div class="t rsiif" id="vendaRsi"></div></div>
+    <div class="blk bid"><div class="t">Support (largest bid)</div><div class="p" id="apoio">—</div><div class="t" id="apoioUsd"></div><div class="t rsiif" id="apoioRsi"></div></div>
   </div>
 </section>
 
@@ -230,6 +264,11 @@ button:hover{background:#273449}
 </section>
 
 <section class="card">
+  <div class="hhead"><h2>Zone inspector</h2><span class="d">click any bar on the liquidation maps to inspect that zone</span></div>
+  <div id="inspector"><span class="muted">Waiting for data…</span></div>
+</section>
+
+<section class="card">
   <div class="hhead"><h2>Liquidation heatmap · last 3 days</h2><span class="d">estimated liquidation levels still open at each 15-min mark (all leverage); white line = price</span></div>
   <div class="legend"><span><span class="heatleg"></span>less → more estimated liquidity</span><span id="heatInfo" class="muted"></span></div>
   <div class="cvwrap tall"><canvas id="cvHeat"></canvas></div>
@@ -246,6 +285,12 @@ button:hover{background:#273449}
   <div class="legend"><span><i style="background:#22c55e"></i>calls (above axis)</span><span><i style="background:#ef4444"></i>puts (below axis)</span><span><i style="border:1px dashed #f5c542;background:none"></i>max pain</span><span><i style="border:1px dashed #e5e7eb;background:none"></i>spot</span></div>
   <div class="cvwrap tall"><canvas id="cvOpt"></canvas></div>
   <div class="sum" id="sumOpt"></div>
+</section>
+
+<section class="card">
+  <div class="hhead"><h2>Liquidation ranking · 10 coins × 2 sides</h2><span class="d" id="scanInfo">waiting…</span></div>
+  <div class="feedwrap" style="max-height:none"><table class="feed rank"><thead><tr><th>Coin</th><th>Side</th><th>Target box</th><th>Distance</th><th>Est. liquidity</th><th>Chance 24 h</th><th>Chance 7 d</th></tr></thead><tbody id="rankBody"></tbody></table></div>
+  <div class="muted" style="font-size:11.5px;margin-top:6px">Ranked by the chance of price touching each coin's target liquidation box (nearest box worth ≥50% of the largest on that side). ▼ long squeeze = longs box below · ▲ short squeeze = shorts box above. Model estimate + volatility arithmetic, no direction.</div>
 </section>
 
 <section class="row bottom">
@@ -265,6 +310,9 @@ button:hover{background:#273449}
       <label>Weights 5x/10x/25x/50x/100x (%)<input type="text" id="cfgW"></label>
       <label>Liquidation pop-up: min. per side in 30 s ($K)<input type="number" id="cfgBurst" step="50" min="10"></label>
       <label>Sweep alert: min. model liquidity taken ($M)<input type="number" id="cfgSweep" step="0.5" min="0.1"></label>
+      <label>Cascade armed: price within (% of ladder start)<input type="number" id="cfgArm" step="0.1" min="0.1"></label>
+      <label>Cascade trigger: real liqs same side in 60 s ($K)<input type="number" id="cfgCascReal" step="50" min="10"></label>
+      <label>Cascade trigger: model levels hit in 2 min ($M)<input type="number" id="cfgCascModel" step="0.5" min="0.1"></label>
     </div>
     <div class="btns">
       <button id="btnApply">Apply &amp; recalculate</button>
@@ -294,7 +342,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -830,6 +878,28 @@ function findVacuum(vals, outward, p) {
   }
   return start !== null && len >= need ? { start, len } : null;
 }
+// Ladder ("escada"): starting from price and walking outward, the stretch of consecutive bands that hold
+// estimated liquidations (≥12% of that side's biggest band), allowing gaps up to 0.4% of price.
+// If price breaks into the start, each liquidation pushes price into the next band: a possible cascade.
+// This is a model hypothesis, not a proven pattern.
+function findLadder(vals, outward, p, b0, dir, days) {
+  let mx = 0; for (const i of outward) mx = Math.max(mx, vals[i]);
+  if (mx <= 0) return null;
+  const fill = 0.12 * mx, maxGap = Math.max(2, Math.ceil(0.004 * p / STEP));
+  let start = null, end = null, gap = 0;
+  for (const i of outward) {
+    if (vals[i] >= fill) { if (start === null) start = i; end = i; gap = 0; }
+    else if (start !== null && ++gap > maxGap) break;
+  }
+  if (start === null) return null;
+  const lo = Math.min(start, end), hi = Math.max(start, end);
+  let usd = 0; for (let i = lo; i <= hi; i++) usd += vals[i];
+  const from = dir < 0 ? (b0 + start + 1) * STEP : (b0 + start) * STEP;
+  const to = dir < 0 ? (b0 + end) * STEP : (b0 + end + 1) * STEP;
+  const span = Math.abs(to / from - 1) * 100;
+  if (span < 1) return null;
+  return { dir, startI: lo, endI: hi, from, to, usd, span, distStart: (from / p - 1) * 100, distEnd: (to / p - 1) * 100, probStart: pTouch(from, p, days), probEnd: pTouch(to, p, days) };
+}
 function computeView(V) {
   const p = S.price; if (!(p > 0)) return null;
   const b0 = Math.floor(p * (1 - V.R) / STEP), b1 = Math.floor(p * (1 + V.R) / STEP), n = b1 - b0 + 1;
@@ -871,9 +941,10 @@ function computeView(V) {
   const vB = findVacuum(side, below.slice().reverse(), p), vA = findVacuum(side, above, p);
   if (vB) { vB.x = (b0 + vB.start + 1) * STEP; vB.dist = (vB.x / p - 1) * 100; vB.lo = (b0 + vB.start - vB.len + 1) * STEP; }
   if (vA) { vA.x = (b0 + vA.start) * STEP; vA.dist = (vA.x / p - 1) * 100; vA.hi = (b0 + vA.start + vA.len) * STEP; }
+  const ladB = findLadder(side, below.slice().reverse(), p, b0, -1, V.T), ladA = findLadder(side, above, p, b0, 1, V.T);
   const real = new Float64Array(n);
   for (let i = 0; i < n; i++) real[i] = S.realBuckets.get(b0 + i) || 0;
-  return { p, b0, n, ip, lev, tot, longV, shortV, side, sumLong, sumShort, maxTot, levL, levS, cum, cumB, cumA, clB, clA, tB, tA, vB, vA, real };
+  return { p, b0, n, ip, lev, tot, longV, shortV, side, sumLong, sumShort, maxTot, levL, levS, cum, cumB, cumA, clB, clA, tB, tA, vB, vA, ladB, ladA, real };
 }
 
 /* ================= Drawing: liquidation maps ================= */
@@ -946,6 +1017,28 @@ function drawView(V, v) {
     ctx.strokeRect(x0 - 1, yT, x1 - x0 + 2, bot - yT);
   }
   ctx.setLineDash([]);
+  // cascade ladders: orange bracket + arrow from the ladder start (near price) to its end
+  for (const L of [v.ladB, v.ladA]) {
+    if (!L) continue;
+    const sd = L.dir < 0 ? 0 : 1, cs = S.casc && S.casc[sd];
+    const st = V.id === 'D' && cs ? cs.state : 'idle';
+    const x0 = X(L.startI), x1 = X(L.endI + 1), yb = top + 58;
+    const col = st === 'running' ? '#fb923c' : st === 'armed' ? '#fbbf24' : 'rgba(245,158,11,.75)';
+    ctx.strokeStyle = col; ctx.fillStyle = col;
+    ctx.lineWidth = st === 'idle' ? 1.2 : 2.2;
+    ctx.setLineDash(st === 'idle' ? [6, 4] : []);
+    ctx.strokeRect(x0, yb - 4, x1 - x0, bot - yb + 4);
+    ctx.setLineDash([]);
+    const xs = L.dir < 0 ? x1 : x0, xe = L.dir < 0 ? x0 : x1;
+    ctx.lineWidth = st === 'idle' ? 1.6 : 2.6;
+    ctx.beginPath(); ctx.moveTo(xs, yb); ctx.lineTo(xe, yb); ctx.stroke();
+    const ah = L.dir < 0 ? 8 : -8;
+    ctx.beginPath(); ctx.moveTo(xe, yb); ctx.lineTo(xe + ah, yb - 5); ctx.lineTo(xe + ah, yb + 5); ctx.closePath(); ctx.fill();
+    ctx.font = 'bold 10.5px system-ui,sans-serif'; ctx.textAlign = L.dir < 0 ? 'right' : 'left';
+    const tag = st === 'running' ? 'CASCADE RUNNING' : st === 'armed' ? 'cascade ARMED' : 'possible cascade';
+    const lbl = `⚡ ${tag} ${fmtPx(L.from, 0)} → ${fmtPx(L.to, 0)} · ${fmtUsd(L.usd)}`;
+    ctx.fillText(lbl, L.dir < 0 ? Math.max(ctx.measureText(lbl).width + 10, xs - 4) : Math.min(W - ctx.measureText(lbl).width - 10, xs + 4), yb - 8);
+  }
   ctx.font = 'bold 11px system-ui,sans-serif';
   const tagY = top - 7;
   if (v.tB) { ctx.fillStyle = '#f87171'; ctx.textAlign = 'right'; ctx.fillText('◀ TARGET ' + fmtPx(v.tB.edge, 0) + ' · P ' + fmtProb(v.tB.prob), Math.max(150, xNow - 8), tagY); }
@@ -1143,12 +1236,19 @@ function rsiState() {
     else if (cur < 30) note = 'oversold';
     else if (cur > 70) note = 'overbought';
     if (cur < 30) cls = 'lo'; else if (cur > 70) cls = 'hi';
-    out.push({ tf, cur, note, cls });
+    out.push({ tf, cur, note, cls, prev: r[r.length - 2], lo4: mn, hi4: mx });
   }
   return out;
 }
 function renderRsi(rs) {
-  $('rsigrid').innerHTML = rs.map(r => `<div class="rsi-c"><div class="tf">${r.tf.label}</div><div class="v ${r.cls || ''}">${r.cur == null ? '—' : r.cur.toFixed(1)}</div><div class="n">${r.note || ''}</div></div>`).join('');
+  // value + arrow vs last closed candle + gauge (0–100, oversold/overbought zones, dot = now, tick = last close)
+  $('rsigrid').innerHTML = rs.map(r => {
+    if (r.cur == null) return `<div class="rsi-c"><div class="tf">${r.tf.label}</div><div class="v">—</div></div>`;
+    const up = r.cur >= r.prev;
+    return `<div class="rsi-c ${r.cls || ''}"><div class="tf">${r.tf.label}</div><div class="v ${r.cls || ''}">${r.cur.toFixed(1)}<span class="arr ${up ? 'pos' : 'neg'}">${up ? '▲' : '▼'}</span></div>` +
+      `<div class="gauge"><i class="mk" style="left:${Math.max(0, Math.min(100, r.prev))}%"></i><i class="dt" style="left:${Math.max(0, Math.min(100, r.cur))}%"></i></div>` +
+      `<div class="n">${r.note || `4-candle range ${r.lo4.toFixed(0)}–${r.hi4.toFixed(0)}`}</div></div>`;
+  }).join('');
 }
 function renderStats() {
   const st = S.stats, tiles = [];
@@ -1158,6 +1258,9 @@ function renderStats() {
   if (st.lsAcc) tile('Long/short accounts · Binance', `${(+st.lsAcc.longAccount * 100).toFixed(1)}% / ${(+st.lsAcc.shortAccount * 100).toFixed(1)}%`, 'ratio ' + (+st.lsAcc.longShortRatio).toFixed(2));
   if (st.lsTop) tile('Top traders (positions)', `${(+st.lsTop.longAccount * 100).toFixed(1)}% / ${(+st.lsTop.shortAccount * 100).toFixed(1)}%`, 'ratio ' + (+st.lsTop.longShortRatio).toFixed(2));
   if (st.taker) tile('Taker buy/sell · 15m', (+st.taker.buySellRatio).toFixed(2), `buy ${fmtEth(+st.taker.buyVol)} · sell ${fmtEth(+st.taker.sellVol)}`, +st.taker.buySellRatio >= 1 ? 'pos' : 'neg');
+  const cx = S.scan && S.scan.ctx;
+  if (cx) tile('Market now · BTC 24 h', fmtPct(cx.btc24), 'BTC $' + fmtPx(cx.btcPx, 0), cx.btc24 >= 0 ? 'pos' : 'neg');
+  if (cx && isFinite(cx.corr)) tile('ETH moves with BTC', cx.corr.toFixed(2), 'correlation of 15-min returns, last 2 days' + (cx.corr > 0.8 ? ' · moving together' : cx.corr < 0.5 ? ' · decoupled' : ''));
   if (S.bnOIraw) tile('Open interest · Binance', fmtEth(S.bnOIraw), S.price ? '≈ ' + fmtUsd(S.bnOIraw * S.price) : '');
   if (S.byOIraw) tile('Open interest · Bybit', fmtEth(S.byOIraw), S.price ? '≈ ' + fmtUsd(S.byOIraw * S.price) : '');
   if (st.mark && st.index) tile('Mark vs index · Binance', fmtPct((st.mark / st.index - 1) * 100, 3), 'mark ' + fmtPx(st.mark) + ' · index ' + fmtPx(st.index));
@@ -1180,6 +1283,12 @@ function computeStatus(v) {
   else if (dA != null && dA <= cfg.appDist) { k = 'APPROACHING TARGET ABOVE'; cls = 'up'; }
   const detail = `Real liquidations 60 s: longs ${fmtUsd(L60)} · shorts ${fmtUsd(S60)} | model bands taken in 5 min: ${fmtUsd(c5L + c5S)}` +
     (dB != null ? ` | target ↓ ${dB.toFixed(2)}% away` : '') + (dA != null ? ` · target ↑ ${dA.toFixed(2)}% away` : '');
+  // a running cascade overrides everything; an armed one overrides neutral/approach
+  if (S.casc) {
+    const run = S.casc.findIndex(c => c.state === 'running'), arm = S.casc.findIndex(c => c.state === 'armed');
+    if (run >= 0) return { k: run ? 'CASCADE UP IN PROGRESS' : 'CASCADE DOWN IN PROGRESS', cls: run ? 'up' : 'down', detail };
+    if (arm >= 0 && (cls === 'neutral' || k.startsWith('APPROACHING'))) return { k: arm ? 'CASCADE ARMED ABOVE' : 'CASCADE ARMED BELOW', cls: arm ? 'up' : 'down', detail };
+  }
   return { k, cls, detail };
 }
 /* ---------- Alerts: sound, toast, edge glow, tab title, desktop notification, history ---------- */
@@ -1198,7 +1307,7 @@ function unlockAudio() {
   } catch (e) { }
   setTimeout(updateSoundPill, 150);
 }
-function audioReady() { return !!actx && actx.state === 'running'; }
+function audioReady() { return S.audioOk || (!!actx && actx.state === 'running'); }
 function updateSoundPill() {
   const pill = $('soundPill'); if (!pill) return;
   pill.hidden = !(cfg.sound && !audioReady());
@@ -1244,8 +1353,16 @@ const ALERT_KINDS = {
   takenUp:      { icon: '⚡', cls: 'up', side: 'SHORTS LIQUIDITY TAKEN', buzz: .35, loud: .9, blips: [[0, 470, 470, .05, 0], [.07, 530, 530, .05, 0], [.14, 470, 470, .05, 0], [.21, 530, 530, .05, 0], [.28, 470, 470, .05, 0], [.36, 400, 540, .18, 0]] },
   approachDown: { icon: '◎', cls: 'down', side: 'HEADING INTO LONGS LIQUIDITY',  buzz: 0, loud: .85, blips: [[0, 470, 360, .32, 0]] },
   approachUp:   { icon: '◎', cls: 'up',   side: 'HEADING INTO SHORTS LIQUIDITY', buzz: 0, loud: .85, blips: [[0, 360, 470, .32, 0]] },
-  test:         { icon: '🤖', cls: 'test', side: 'TEST', buzz: .16, loud: 1, blips: [[0, 300, 300, .07, 0], [.1, 360, 360, .07, 0], [.2, 430, 430, .07, 0], [.3, 430, 560, .24, 1]] }
+  // cascades: one long wobbly robot slide + three pulses — the ONLY alerts that make sound by default
+  cascadeDown:  { icon: '⚡', cls: 'down', side: 'CASCADE DOWN · LONGS', buzz: .3, loud: 1.1, blips: [[0, 520, 260, .45, 1], [.5, 300, 300, .08, 0], [.62, 280, 280, .08, 0], [.74, 250, 250, .16, 0]] },
+  cascadeUp:    { icon: '⚡', cls: 'up',   side: 'CASCADE UP · SHORTS',  buzz: .3, loud: 1.1, blips: [[0, 260, 520, .45, 1], [.5, 420, 420, .08, 0], [.62, 460, 460, .08, 0], [.74, 520, 520, .16, 0]] },
+  setupLong:    { icon: '▲', cls: 'up',   side: '15-MIN LONG SETUP',  buzz: 0, loud: .8, blips: [[0, 360, 470, .3, 0]] },
+  setupShort:   { icon: '▼', cls: 'down', side: '15-MIN SHORT SETUP', buzz: 0, loud: .8, blips: [[0, 470, 360, .3, 0]] },
+  test:         { icon: '🤖', cls: 'test', side: 'TEST (cascade sound)', buzz: .3, loud: 1.1, blips: [[0, 520, 260, .45, 1], [.5, 300, 300, .08, 0], [.62, 280, 280, .08, 0], [.74, 250, 250, .16, 0]] }
 };
+// Only these make sound / vibrate unless "sound on every alert" is ticked.
+const SOUND_KINDS = new Set(['cascadeDown', 'cascadeUp', 'test']);
+function soundAllowed(kind) { return cfg.soundAll || SOUND_KINDS.has(kind); }
 function alertKind(k) {
   if (k.startsWith('LIQUIDITY GRAB BELOW')) return 'grabDown';
   if (k.startsWith('LIQUIDITY GRAB ABOVE')) return 'grabUp';
@@ -1254,45 +1371,78 @@ function alertKind(k) {
   if (k.startsWith('APPROACHING TARGET ABOVE')) return 'approachUp';
   return null;
 }
-function playAlert(kind) {
-  if (!cfg.sound) return;
-  const A = ALERT_KINDS[kind]; if (!A) return;
+// Builds the robot phrase into any audio context (live or offline).
+function synthInto(ctx, A, t0) {
+  // chain: blips → master → low-pass (removes harsh highs) → compressor → out, plus a tiny metallic slap-back
+  const master = ctx.createGain(); master.gain.value = 0.5 * A.loud;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.7;
+  const comp = ctx.createDynamicsCompressor();
+  const slap = ctx.createDelay(0.2); slap.delayTime.value = 0.045;
+  const wet = ctx.createGain(); wet.gain.value = 0.18;
+  master.connect(lp); lp.connect(comp); comp.connect(ctx.destination);
+  lp.connect(slap); slap.connect(wet); wet.connect(ctx.destination);
+  const nodes = [master, lp, comp, slap, wet];
+  for (const [st, f0, f1, len, warble] of A.blips) {
+    const a = t0 + st, end = a + len;
+    // body: triangle (round) + a little square (robotic buzz), both gliding f0 → f1
+    for (const [type, lvl] of [['triangle', 0.9], ['square', A.buzz]]) {
+      if (!(lvl > 0)) continue;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, a);
+      o.frequency.exponentialRampToValueAtTime(f1, end - 0.01);
+      if (warble) {   // fast wobble on pitch for the droid "voice"
+        const lfo = ctx.createOscillator(), lg = ctx.createGain();
+        lfo.frequency.value = 26; lg.gain.value = f0 * 0.07;
+        lfo.connect(lg).connect(o.frequency); lfo.start(a); lfo.stop(end + 0.02); nodes.push(lfo, lg);
+      }
+      g.gain.setValueAtTime(0.0001, a);
+      g.gain.exponentialRampToValueAtTime(lvl, a + 0.008);
+      g.gain.setValueAtTime(lvl * 0.85, end - 0.035);
+      g.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(g).connect(master); o.start(a); o.stop(end + 0.02); nodes.push(o, g);
+    }
+  }
+  return nodes;
+}
+// Sounds are pre-rendered to WAV files and played with an <audio> element: on phones this is more
+// reliable than live Web Audio (it survives the browser suspending the audio engine). Web Audio is the fallback.
+const WAV = {};
+function toWav(buf) {
+  const d = buf.getChannelData(0), n = d.length, SR = buf.sampleRate;
+  const ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, d[i])); v.setInt16(44 + i * 2, s * 0x7fff, true); }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+async function prerenderSounds() {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!OAC) return;
+  for (const k of Object.keys(ALERT_KINDS)) {
+    try {
+      const SR = 44100, off = new OAC(1, Math.ceil(SR * 1.3), SR);
+      synthInto(off, ALERT_KINDS[k], 0.02);
+      WAV[k] = URL.createObjectURL(toWav(await off.startRendering()));
+    } catch (e) { /* fallback to live Web Audio */ }
+  }
+}
+function playWebAudio(A) {
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state !== 'running') { try { actx.resume().catch(() => { }); } catch (e) { } }
-    const t0 = actx.currentTime + 0.02;
-    // chain: blips → master → low-pass (removes harsh highs) → compressor → out, plus a tiny metallic slap-back
-    const master = actx.createGain(); master.gain.value = 0.5 * A.loud;
-    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.7;
-    const comp = actx.createDynamicsCompressor();
-    const slap = actx.createDelay(0.2); slap.delayTime.value = 0.045;
-    const wet = actx.createGain(); wet.gain.value = 0.18;
-    master.connect(lp); lp.connect(comp); comp.connect(actx.destination);
-    lp.connect(slap); slap.connect(wet); wet.connect(actx.destination);
-    const nodes = [];
-    for (const [st, f0, f1, len, warble] of A.blips) {
-      const a = t0 + st, end = a + len;
-      // body: triangle (round) + a little square (robotic buzz), both gliding f0 → f1
-      for (const [type, lvl] of [['triangle', 0.9], ['square', A.buzz]]) {
-        if (!(lvl > 0)) continue;
-        const o = actx.createOscillator(), g = actx.createGain();
-        o.type = type;
-        o.frequency.setValueAtTime(f0, a);
-        o.frequency.exponentialRampToValueAtTime(f1, end - 0.01);
-        if (warble) {   // fast wobble on pitch for the droid "voice"
-          const lfo = actx.createOscillator(), lg = actx.createGain();
-          lfo.frequency.value = 26; lg.gain.value = f0 * 0.07;
-          lfo.connect(lg).connect(o.frequency); lfo.start(a); lfo.stop(end + 0.02); nodes.push(lfo, lg);
-        }
-        g.gain.setValueAtTime(0.0001, a);
-        g.gain.exponentialRampToValueAtTime(lvl, a + 0.008);
-        g.gain.setValueAtTime(lvl * 0.85, end - 0.035);
-        g.gain.exponentialRampToValueAtTime(0.0001, end);
-        o.connect(g).connect(master); o.start(a); o.stop(end + 0.02); nodes.push(o, g);
-      }
-    }
-    setTimeout(() => { try { nodes.forEach(n => n.disconnect()); master.disconnect(); lp.disconnect(); slap.disconnect(); wet.disconnect(); comp.disconnect(); } catch (e) { } }, 3000);
+    const nodes = synthInto(actx, A, actx.currentTime + 0.02);
+    setTimeout(() => { try { nodes.forEach(n => n.disconnect()); } catch (e) { } }, 3000);
   } catch (e) { /* no audio */ }
+}
+function playAlert(kind) {
+  if (!cfg.sound || !soundAllowed(kind)) return;
+  const A = ALERT_KINDS[kind]; if (!A) return;
+  if (WAV[kind]) {
+    try { const a = new Audio(WAV[kind]); a.volume = 1; a.play().then(() => { S.audioOk = true; updateSoundPill(); }).catch(() => playWebAudio(A)); return; } catch (e) { }
+  }
+  playWebAudio(A);
 }
 let titleTimer = null;
 function flashTitle(text) {
@@ -1340,11 +1490,11 @@ S.lastAlertAt = {};
 function fireAlert(kind, title, detail, opts) {
   opts = opts || {};
   const now = Date.now();
-  if (kind !== 'test' && now - (S.lastAlertAt[kind] || 0) < 30000) return false;   // 30 s cooldown per alert type
+  if (kind !== 'test' && now - (S.lastAlertAt[kind] || 0) < (opts.cooldown || 30000)) return false;   // cooldown per alert type
   S.lastAlertAt[kind] = now;
   const A = ALERT_KINDS[kind];
   playAlert(kind);
-  vibrate(A.cls);
+  if (soundAllowed(kind)) vibrate(A.cls);
   showToast(kind, title, detail);
   if (opts.glow !== false) edgeGlow(A.cls);
   flashTitle(A.icon + ' ' + A.side + ' · ETH $' + fmtPx(S.price, 0));
@@ -1372,7 +1522,7 @@ function checkBursts() {
 }
 
 /* ---------- Model sweeps: price running through boxes of estimated liquidation levels ---------- */
-S.sw = [null, null]; S.sweepT = 0;
+S.sw = [null, null]; S.sweepT = 0; S.lastSweepAt = [0, 0];
 function sweepText(sw) { return `${fmtPx(sw.lo, 0)}–${fmtPx(sw.hi, 0)}`; }
 function closeSweep(side) {
   const sw = S.sw[side]; S.sw[side] = null;
@@ -1394,7 +1544,7 @@ function updateSweeps() {
   for (const side of [0, 1]) {
     const sw = S.sw[side]; if (!sw) continue;
     if (!sw.alerted && sw.usd >= cfg.sweepMin * 1e6) {
-      sw.alerted = true;
+      sw.alerted = true; S.lastSweepAt[side] = Date.now();
       fireAlert(side ? 'sweepUp' : 'sweepDown',
         `Liquidity entered to take the ${sweepText(sw)} box`,
         `~${fmtUsd(sw.usd)} of estimated ${side ? 'shorts' : 'longs'} liquidation levels hit ${side ? 'above' : 'below'} the old price.`, { glow: false });
@@ -1436,6 +1586,15 @@ function renderLiveRead() {
   const c15 = ch(15 * 60000), c60 = ch(3600e3), c240 = ch(4 * 3600e3);
   const dir = c15 == null ? '' : c15 <= -0.3 ? ' — pushing <b class="neg">down into longs liquidity</b>' : c15 >= 0.3 ? ' — pushing <b class="pos">up into shorts liquidity</b>' : ' — ranging';
   out.push(`Price <b>$${fmtPx(p)}</b>: ${fmtPct(c15)} in 15 min, ${fmtPct(c60)} in 1 h, ${fmtPct(c240)} in 4 h${dir}.`);
+  // cascades
+  for (const side of [0, 1]) {
+    const c = S.casc[side], L = c.state === 'running' ? c.ladder : (side ? v.ladA : v.ladB);
+    if (!L) continue;
+    const cl = side ? 'pos' : 'neg', w = side ? 'above' : 'below';
+    if (c.state === 'running') out.push(`<b class="${cl}">⚡ CASCADE ${side ? 'UP' : 'DOWN'} RUNNING</b> since ${hhmmss(c.since)}: started at $${fmtPx(c.startPx, 0)}, now ${fmtPct(c.moved)}; ladder runs to $${fmtPx(L.to, 0)} (${fmtUsd(L.usd)} of estimated ${side ? 'shorts' : 'longs'}).`);
+    else out.push(`⚡ Possible cascade ${w}${c.state === 'armed' ? ' <b class="warnc">ARMED</b>' : ''}: if $${fmtPx(L.from, 0)} breaks → up to $${fmtPx(L.to, 0)} (${fmtUsd(L.usd)} over ${L.span.toFixed(1)}% of price). Ladder start ${fmtPct(L.distStart)} away, 1-day touch chance ${fmtProb(L.probStart)}. <span class="muted">Triggers (with sound) only if real ${side ? 'short' : 'long'} liquidations ≥ ${fmtUsd(cfg.cascadeMin * 1e3)}/60 s hit while armed.</span>`);
+  }
+  if (S.setup) out.push(`15-min setup: <b class="${S.setup.cls === 'up' ? 'pos' : S.setup.cls === 'down' ? 'neg' : ''}">${esc(S.setup.signal)}</b> (long ${S.setup.sL}/7 · short ${S.setup.sS}/7).`);
   // 2) sweep in progress
   for (const side of [0, 1]) {
     const sw = S.sw[side];
@@ -1511,6 +1670,8 @@ function renderBook() {
   $('apoioUsd').textContent = b.bid ? fmtUsd(b.bid.usd) + (S.price ? ' · ' + fmtPct((b.bid.px / S.price - 1) * 100) : '') : '';
   $('venda').textContent = b.ask ? '$' + fmtPx(b.ask.px, 0) : '—';
   $('vendaUsd').textContent = b.ask ? fmtUsd(b.ask.usd) + (S.price ? ' · ' + fmtPct((b.ask.px / S.price - 1) * 100) : '') : '';
+  $('apoioRsi').innerHTML = b.bid ? `RSI if price goes to ${fmtPx(b.bid.px, 0)}: ${rsiAtLine(b.bid.px)}` : '';
+  $('vendaRsi').innerHTML = b.ask ? `RSI if price goes to ${fmtPx(b.ask.px, 0)}: ${rsiAtLine(b.ask.px)}` : '';
 }
 function render() {
   const step = (name, fn) => { try { fn(); } catch (e) { console.error('render ' + name, e); } };
@@ -1524,13 +1685,18 @@ function render() {
   });
   const rs = rsiState(); step('rsi', () => renderRsi(rs));
   if (S.histReady && S.price) {
-    for (const V of VIEWS) step('view' + V.id, () => { const v = computeView(V); if (!v) return; S.views[V.id] = v; drawView(V, v); renderSummary(V, v); });
+    for (const V of VIEWS) step('view' + V.id, () => { const v = computeView(V); if (!v) return; S.views[V.id] = v; });
+    step('sweeps', updateSweeps);
+    step('cascades', updateCascades);
+    for (const V of VIEWS) step('draw' + V.id, () => { const v = S.views[V.id]; if (v) { drawView(V, v); renderSummary(V, v); } });
     step('status', () => renderStatus(S.views.D));
     step('heat', drawHeat);
-    step('sweeps', updateSweeps);
     step('bursts', checkBursts);
+    step('setup', renderSetup);
+    step('inspector', renderInspector);
     step('liveread', renderLiveRead);
   }
+  step('scan', renderScan);
   step('options', () => { S.optView = computeOpt(); drawOptions(S.optView); renderOptSummary(S.optView); });
   step('stats', renderStats);
   step('notes', () => renderNotes(rs));
@@ -1542,6 +1708,290 @@ function render() {
     pruneEntries();
     const c2 = now - 600000; S.consumedLog = S.consumedLog.filter(e => e.t >= c2);
   }
+}
+
+/* ================= Cascades: armed → running → ended ================= */
+// Armed:   price within cfg.armDist % of a ladder start (1-day map).
+// Running: armed AND real liquidations on that side in 60 s ≥ cfg.cascadeMin ($K)
+//          AND model levels hit on that side in 2 min ≥ cfg.cascadeModel ($M).  → the only alert with sound.
+// Ended:   no model level hit on that side for 3 min.
+S.casc = [{ state: 'idle' }, { state: 'idle' }];
+function lastConsumedAt(side) { for (let i = S.consumedLog.length - 1; i >= 0; i--) if (S.consumedLog[i].s === side) return S.consumedLog[i].t; return 0; }
+function updateCascades() {
+  const v = S.views.D; if (!v || !S.price) return;
+  const now = Date.now();
+  for (const side of [0, 1]) {
+    const c = S.casc[side], L = side ? v.ladA : v.ladB;
+    c.real60 = sumWindow(S.realLiq, 60000, e => e.side === side);
+    c.model2 = sumWindow(S.consumedLog, 120000, e => e.s === side);
+    if (c.state === 'running') {
+      c.moved = (S.price / c.startPx - 1) * 100;
+      if (now - lastConsumedAt(side) > 180000 && now - c.since > 120000) {
+        logEvent(side ? 'up' : 'down', `<b>Cascade ${side ? 'up' : 'down'} ended</b> at $${fmtPx(S.price, 0)} after ${fmtDur(now - c.since)}: price moved ${fmtPct(c.moved)} from $${fmtPx(c.startPx, 0)} (ladder ran to $${fmtPx(c.ladder.to, 0)}).`);
+        c.state = 'idle';
+      } else continue;
+    }
+    c.ladder = L;
+    c.dist = L ? Math.abs(L.distStart) : null;
+    const was = c.state;
+    c.state = L && c.dist <= cfg.armDist ? 'armed' : 'idle';
+    if (c.state === 'armed' && was !== 'armed')
+      logEvent(side ? 'up' : 'down', `Cascade <b>armed ${side ? 'above' : 'below'}</b>: price ${c.dist.toFixed(2)}% from the ladder start $${fmtPx(L.from, 0)} (runs to $${fmtPx(L.to, 0)}, ${fmtUsd(L.usd)}).`);
+    if (c.state === 'armed' && c.real60 >= cfg.cascadeMin * 1e3 && c.model2 >= cfg.cascadeModel * 1e6) {
+      Object.assign(c, { state: 'running', since: now, startPx: S.price, ladder: Object.assign({}, L), moved: 0 });
+      fireAlert(side ? 'cascadeUp' : 'cascadeDown',
+        `Cascade ${side ? 'UP' : 'DOWN'}: $${fmtPx(L.from, 0)} → up to $${fmtPx(L.to, 0)}`,
+        `${fmtUsd(L.usd)} of estimated ${side ? 'shorts' : 'longs'} stacked over ${L.span.toFixed(1)}% · real ${side ? 'short' : 'long'} liquidations 60 s ${fmtUsd(c.real60)} · model levels hit 2 min ${fmtUsd(c.model2)}`,
+        { cooldown: 300000 });
+    }
+  }
+}
+
+/* ================= RSI "if price goes to X" (arithmetic, not a forecast) ================= */
+function rsiAt(k, px) {
+  const c = S.rsi[k]; if (!c || c.length < 20 || !(px > 0)) return null;
+  const cc = c.slice(); cc[cc.length - 1] = px;
+  const r = wilderRsi(cc); return r[r.length - 1];
+}
+function rsiAtLine(px) {
+  return TFS.map(tf => { const r = rsiAt(tf.k, px); return r == null ? '' : `${tf.label} <b class="${r < 30 ? 'lo' : r > 70 ? 'hi' : ''}">${r.toFixed(1)}</b>`; }).filter(Boolean).join(' · ');
+}
+
+/* ================= Zone inspector ================= */
+S.sel = null;   // {view:'D'|'W', b: absolute band}
+function renderInspector() {
+  const viewId = S.sel ? S.sel.view : 'D', v = S.views[viewId]; if (!v) return;
+  let lo, hi;
+  if (S.sel) {
+    const i = S.sel.b - v.b0;
+    const cl = v.clB.concat(v.clA).find(c => i >= c.start && i <= c.end);
+    if (cl) { lo = cl.start; hi = cl.end; } else { lo = Math.max(0, i - 1); hi = Math.min(v.n - 1, i + 1); }
+  } else {
+    const t = v.tB || v.tA; if (!t) { $('inspector').innerHTML = '<span class="muted">No zone to inspect yet.</span>'; return; }
+    lo = t.start; hi = t.end;
+  }
+  const dir = hi < v.ip ? -1 : lo > v.ip ? 1 : 0;
+  const pLo = (v.b0 + lo) * STEP, pHi = (v.b0 + hi + 1) * STEP;
+  const edge = dir < 0 ? pHi : dir > 0 ? pLo : v.p;
+  let longs = 0, shorts = 0;
+  for (let i = lo; i <= hi; i++) { longs += v.longV[i]; shorts += v.shortV[i]; }
+  const cum = dir < 0 ? v.cum[lo] : dir > 0 ? v.cum[hi] : 0;
+  const t15 = Date.now() - 900000;
+  let rl = 0, rs = 0, rn = 0;
+  for (const e of S.realLiq) if (e.t >= t15 && e.price >= pLo && e.price <= pHi) { rn++; if (e.side === 0) rl += e.usd; else rs += e.usd; }
+  const hz = [['1 h', 1 / 24], ['4 h', 4 / 24], ['24 h', 1], ['1 week', 7]];
+  const lad = dir < 0 ? v.ladB : dir > 0 ? v.ladA : null;
+  const inLad = lad && pLo < Math.max(lad.from, lad.to) && pHi > Math.min(lad.from, lad.to);
+  const sideTxt = dir < 0 ? '<b class="neg">longs liquidity below</b>' : dir > 0 ? '<b class="pos">shorts liquidity above</b>' : 'zone around the current price';
+  $('inspector').innerHTML =
+    `<div class="insp-h"><b>$${fmtPx(pLo, 0)}–${fmtPx(pHi, 0)}</b> · ${sideTxt} · ${fmtPct((edge / v.p - 1) * 100)} from price · ${viewId === 'D' ? '1-day' : '1-week'} map${S.sel ? '' : ' <span class="muted">(default: target below — click any bar to change)</span>'}</div>` +
+    `<div class="insp-g">` +
+    `<div><div class="t">Estimated liquidations in zone</div><div class="v">${fmtUsd(dir > 0 ? shorts : dir < 0 ? longs : longs + shorts)}</div><div class="s">longs ${fmtUsd(longs)} · shorts ${fmtUsd(shorts)}</div></div>` +
+    `<div><div class="t">Accumulated from price to here</div><div class="v">${fmtUsd(cum)}</div><div class="s">all ${dir > 0 ? 'shorts' : 'longs'} levels on the way</div></div>` +
+    `<div><div class="t">Real liquidations here · 15 min</div><div class="v">${rn ? fmtUsd(rl + rs) : 'none'}</div><div class="s">${rn ? `${rn} orders · longs ${fmtUsd(rl)} / shorts ${fmtUsd(rs)}` : 'Binance + Bybit feeds'}</div></div>` +
+    `<div><div class="t">Chance price reaches $${fmtPx(edge, 0)}</div><div class="v">${hz.map(([l, d]) => `<span class="hz">${l} <b>${fmtProb(pTouch(edge, v.p, d))}</b></span>`).join('')}</div><div class="s">from volatility (daily σ ${S.sigma ? (S.sigma * 100).toFixed(2) : '—'}%), no direction</div></div>` +
+    `</div>` +
+    `<div class="insp-l">RSI if price goes to $${fmtPx(edge, 0)}: ${rsiAtLine(edge) || '—'} <span class="muted">— arithmetic, not a forecast</span></div>` +
+    (inLad ? `<div class="insp-l casc">⚡ Inside a possible cascade ladder: if $${fmtPx(lad.from, 0)} breaks → up to $${fmtPx(lad.to, 0)} (${fmtUsd(lad.usd)} over ${lad.span.toFixed(1)}% of price). <span class="muted">Model hypothesis, not proven.</span></div>` : '');
+}
+
+/* ================= 15-minute setup (rule checklist, not advice) ================= */
+function candles15() {
+  if (!S.hist) return [];
+  const map = new Map();
+  for (const k of S.hist.candles.slice(-400)) map.set(k.t, Object.assign({}, k));
+  const addM = m => {
+    const t = Math.floor(m.t / T15) * T15; let c = map.get(t);
+    if (!c) { c = { t, o: m.o, h: m.h, l: m.l, c: m.c, lastM: m.t }; map.set(t, c); }
+    else { c.h = Math.max(c.h, m.h); c.l = Math.min(c.l, m.l); if (m.t >= (c.lastM || 0)) { c.c = m.c; c.lastM = m.t; } }
+  };
+  for (const m of S.liveMinutes) addM(m);
+  if (S.curMin) addM(S.curMin);
+  return [...map.values()].sort((a, b) => a.t - b.t);
+}
+function atrSeries(cs, n = 14) {
+  const out = new Array(cs.length).fill(NaN); let a = null;
+  for (let i = 1; i < cs.length; i++) {
+    const tr = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    a = a == null ? tr : (a * (n - 1) + tr) / n; if (i >= n) out[i] = a;
+  }
+  return out;
+}
+function candleShape(c, prev) {
+  const rng = (c.h - c.l) || 1e-9, lowW = (Math.min(c.o, c.c) - c.l) / rng, upW = (c.h - Math.max(c.o, c.c)) / rng;
+  const bullEng = prev && c.c > c.o && prev.c < prev.o && c.c >= prev.o && c.o <= prev.c;
+  const bearEng = prev && c.c < c.o && prev.c > prev.o && c.c <= prev.o && c.o >= prev.c;
+  return {
+    bull: (lowW >= 0.4 && (c.c - c.l) / rng >= 0.5) || bullEng,
+    bear: (upW >= 0.4 && (c.h - c.c) / rng >= 0.5) || bearEng,
+    txt: bullEng ? 'bullish engulfing' : bearEng ? 'bearish engulfing' : lowW >= 0.4 ? `lower wick ${Math.round(lowW * 100)}% of range` : upW >= 0.4 ? `upper wick ${Math.round(upW * 100)}% of range` : (c.c >= c.o ? 'green body' : 'red body')
+  };
+}
+// Backtest of the core trigger (RSI extreme in last 4 + RSI turning + rejection candle) on the loaded 15-min history:
+// entry at the trigger close; win = +1 ATR before −1 ATR within the next 16 candles (4 h).
+function backtestCore(closed) {
+  const r = wilderRsi(closed.map(c => c.c)), atr = atrSeries(closed);
+  const res = { L: { n: 0, w: 0, l: 0 }, S: { n: 0, w: 0, l: 0 } };
+  for (let i = 20; i < closed.length - 1; i++) {
+    const sh = candleShape(closed[i], closed[i - 1]), a = atr[i];
+    if (!(a > 0)) continue;
+    const mn = Math.min(r[i - 3], r[i - 2], r[i - 1], r[i]), mx = Math.max(r[i - 3], r[i - 2], r[i - 1], r[i]);
+    for (const [k, ok, dir] of [['L', mn <= 30 && r[i] > r[i - 1] && sh.bull, 1], ['S', mx >= 70 && r[i] < r[i - 1] && sh.bear, -1]]) {
+      if (!ok) continue;
+      const e = closed[i].c; let out = 0;
+      for (let j = i + 1; j < Math.min(closed.length, i + 17); j++) {
+        const fav = dir > 0 ? closed[j].h >= e + a : closed[j].l <= e - a, adv = dir > 0 ? closed[j].l <= e - a : closed[j].h >= e + a;
+        if (adv) { out = -1; break; } if (fav) { out = 1; break; }
+      }
+      res[k].n++; if (out > 0) res[k].w++; else if (out < 0) res[k].l++;
+    }
+  }
+  return res;
+}
+S.setupBT = null; S.setupBTkey = 0; S.lastSetupAlert = 0;
+function setupEval() {
+  const cs = candles15(); if (cs.length < 40 || !S.price) return null;
+  const now = Date.now();
+  const closed = cs[cs.length - 1].t + T15 <= now ? cs : cs.slice(0, -1);
+  const last = closed[closed.length - 1], prev = closed[closed.length - 2];
+  const rC = wilderRsi(closed.map(c => c.c)), rAll = wilderRsi(cs.map(c => c.c));
+  const rsiNow = rAll[rAll.length - 1], rsiLast = rC[rC.length - 1], last4 = rC.slice(-4);
+  const sh = candleShape(last, prev);
+  const r4h = rsiAt('4h', S.price), r1d = rsiAt('1d', S.price);
+  const taker = S.stats.taker ? +S.stats.taker.buySellRatio : null;
+  const v = S.views.D;
+  const nb = v && v.clB.slice().sort((a, b) => b.end - a.end)[0], na = v && v.clA.slice().sort((a, b) => a.start - b.start)[0];
+  const swept = s => now - (S.lastSweepAt[s] || 0) < 3600e3;
+  const flush = s => sumWindow(S.realLiq, 1800000, e => e.side === s) >= cfg.burstMin * 1e3;
+  const long = [
+    ['15m RSI oversold (≤30) in the last 4 closed candles', Math.min(...last4) <= 30, `min ${Math.min(...last4).toFixed(1)}`],
+    ['15m RSI turning up', rsiNow > rsiLast, `${rsiLast.toFixed(1)} → ${rsiNow.toFixed(1)}`],
+    ['Trigger: last closed 15m candle shows buyer rejection', sh.bull, sh.txt],
+    ['Longs liquidity swept below (1 h) or longs flushed (30 min)', swept(0) || flush(0), swept(0) ? 'sweep' : flush(0) ? 'flush' : 'no'],
+    ['4H RSI < 60 and 1D RSI < 65', r4h != null && r1d != null && r4h < 60 && r1d < 65, `4H ${r4h == null ? '—' : r4h.toFixed(1)} · 1D ${r1d == null ? '—' : r1d.toFixed(1)}`],
+    ['Taker flow buying (buy/sell ≥ 1.0)', taker != null && taker >= 1, taker == null ? '—' : taker.toFixed(2)],
+    ['Shorts box above in reach (≥0.8% away, ≥50% 1-day chance)', !!na && na.dist >= 0.8 && (na.prob || 0) >= 0.5, na ? `${fmtPx(na.edge, 0)} · ${fmtPct(na.dist)} · ${fmtProb(na.prob)}` : 'none']
+  ];
+  const short = [
+    ['15m RSI overbought (≥70) in the last 4 closed candles', Math.max(...last4) >= 70, `max ${Math.max(...last4).toFixed(1)}`],
+    ['15m RSI turning down', rsiNow < rsiLast, `${rsiLast.toFixed(1)} → ${rsiNow.toFixed(1)}`],
+    ['Trigger: last closed 15m candle shows seller rejection', sh.bear, sh.txt],
+    ['Shorts liquidity swept above (1 h) or shorts flushed (30 min)', swept(1) || flush(1), swept(1) ? 'sweep' : flush(1) ? 'flush' : 'no'],
+    ['4H RSI > 40 and 1D RSI > 35', r4h != null && r1d != null && r4h > 40 && r1d > 35, `4H ${r4h == null ? '—' : r4h.toFixed(1)} · 1D ${r1d == null ? '—' : r1d.toFixed(1)}`],
+    ['Taker flow selling (buy/sell ≤ 1.0)', taker != null && taker <= 1, taker == null ? '—' : taker.toFixed(2)],
+    ['Longs box below in reach (≥0.8% away, ≥50% 1-day chance)', !!nb && nb.dist <= -0.8 && (nb.prob || 0) >= 0.5, nb ? `${fmtPx(nb.edge, 0)} · ${fmtPct(nb.dist)} · ${fmtProb(nb.prob)}` : 'none']
+  ];
+  const sL = long.filter(x => x[1]).length, sS = short.filter(x => x[1]).length;
+  let signal = 'NO SETUP', cls = 'neutral', side = null;
+  if (long[2][1] && sL >= 5 && sL > sS) { signal = 'LONG SETUP'; cls = 'up'; side = 'L'; }
+  else if (short[2][1] && sS >= 5 && sS > sL) { signal = 'SHORT SETUP'; cls = 'down'; side = 'S'; }
+  else if (sL >= 4 && sL > sS) { signal = 'WAIT · long side building, needs 15-min trigger'; cls = 'warn'; }
+  else if (sS >= 4 && sS > sL) { signal = 'WAIT · short side building, needs 15-min trigger'; cls = 'warn'; }
+  // reference levels (rule output): invalidation = trigger candle extreme, target = nearest opposite box
+  let ref = null;
+  if (side === 'L') { const inv = last.l, tgt = na ? na.edge : null; ref = { inv, tgt, rr: tgt ? (tgt - S.price) / Math.max(1e-9, S.price - inv) : null }; }
+  if (side === 'S') { const inv = last.h, tgt = nb ? nb.edge : null; ref = { inv, tgt, rr: tgt ? (S.price - tgt) / Math.max(1e-9, inv - S.price) : null }; }
+  if (S.setupBTkey !== last.t) { S.setupBT = backtestCore(closed); S.setupBTkey = last.t; }
+  return { long, short, sL, sS, signal, cls, side, ref, last, rsiNow, nextClose: cs[cs.length - 1].t + T15 };
+}
+function renderSetup() {
+  const s = setupEval(); if (!s) return;
+  S.setup = s;
+  const row = ([t, ok, val]) => `<li class="${ok ? 'ok' : ''}"><span class="ck">${ok ? '✔' : '·'}</span>${t}<span class="vv">${esc(val)}</span></li>`;
+  const bt = S.setupBT, pct = x => x.n ? Math.round(x.w / x.n * 100) + '%' : '—';
+  $('setupHead').className = 'setup-sig ' + s.cls;
+  $('setupHead').innerHTML = `${s.signal}<small>long ${s.sL}/7 · short ${s.sS}/7 · next 15-min close in ${fmtDur(s.nextClose - Date.now())}</small>`;
+  $('setupBody').innerHTML =
+    `<div class="setup-cols"><div><h3 class="pos">Long checklist</h3><ul class="ck-list">${s.long.map(row).join('')}</ul></div>` +
+    `<div><h3 class="neg">Short checklist</h3><ul class="ck-list">${s.short.map(row).join('')}</ul></div></div>` +
+    (s.ref ? `<div class="setup-ref">Reference levels (rule output): invalidation <b>$${fmtPx(s.ref.inv)}</b> (trigger candle ${s.side === 'L' ? 'low' : 'high'}) · nearest opposite liquidity box <b>${s.ref.tgt ? '$' + fmtPx(s.ref.tgt, 0) : '—'}</b>${s.ref.rr ? ` · distance ratio ${s.ref.rr.toFixed(1)}:1` : ''}</div>` : '') +
+    (bt ? `<div class="setup-bt">Core trigger backtest on the loaded 15-min history (~10 days): long fired ${bt.L.n}× (hit +1 ATR first ${bt.L.w}, −1 ATR first ${bt.L.l}, win ${pct(bt.L)}) · short fired ${bt.S.n}× (win ${pct(bt.S)}). Small sample, no fees/slippage — use it to calibrate trust, not as a promise.</div>` : '');
+  // silent pop-up once per trigger candle
+  if (s.side && S.lastSetupAlert !== s.last.t) {
+    S.lastSetupAlert = s.last.t;
+    fireAlert(s.side === 'L' ? 'setupLong' : 'setupShort', `${s.signal}: ${s.side === 'L' ? s.sL : s.sS}/7 conditions`,
+      `trigger candle ${s.last.t ? new Date(s.last.t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''} · ${candleShape(s.last, null).txt}` + (s.ref && s.ref.tgt ? ` · opposite box $${fmtPx(s.ref.tgt, 0)}` : ''), { glow: false, cooldown: 600000 });
+  }
+}
+
+/* ================= 10-coin liquidation ranking (same model, Binance data) ================= */
+const SCAN_COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'AAVE', 'UNI', 'LINK', 'AVAX', 'ONDO'];
+S.scan = { rows: [], at: 0, busy: false, ctx: null, err: 0 };
+function stepFor(p) { const raw = p * 0.001, e = 10 ** Math.floor(Math.log10(raw)), m = raw / e; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * e; }
+function fmtCoin(p) { return fmtPx(p, p >= 100 ? 2 : p >= 1 ? 4 : 5); }
+function quickMap(candles, pts, coin) {
+  const oi = oiDeltas(pts), p = candles[candles.length - 1].c, step = stepFor(p);
+  const m = cfg.mm / 100, wsum = cfg.weights.reduce((a, b) => a + b, 0) || 1;
+  let ents = [], prev = null, k2 = 0;
+  for (const k of candles) {
+    const pc = prev == null ? k.c : prev;
+    const bl = Math.floor(Math.min(k.l, pc) / step), bh = Math.floor(Math.max(k.h, pc) / step);
+    for (const e of ents) if (e.a && e.b >= bl && e.b <= bh) e.a = false;
+    const d = oi.get(k.t);
+    if (d > 0) {
+      const typ = (k.h + k.l + k.c) / 3, usd = d * typ * cfg.mult, lf = k.c > k.o ? 0.7 : k.c < k.o ? 0.3 : 0.5;
+      for (let i = 0; i < 5; i++) {
+        const L = LEVS[i], w = cfg.weights[i] / wsum; if (!(w > 0)) continue;
+        ents.push({ b: Math.floor(typ * (1 - 1 / L + m) / step), s: 0, u: usd * lf * w, a: true }, { b: Math.floor(typ * (1 + 1 / L - m) / step), s: 1, u: usd * (1 - lf) * w, a: true });
+      }
+    }
+    prev = k.c;
+    if (++k2 % 50 === 0) ents = ents.filter(e => e.a);
+  }
+  const b0 = Math.floor(p * 0.88 / step), n = Math.floor(p * 1.12 / step) - b0 + 1, ip = Math.floor(p / step) - b0;
+  const side = new Float64Array(n), below = [], above = [];
+  for (const e of ents) { if (!e.a) continue; const i = e.b - b0; if (i < 0 || i >= n) continue; if (e.s === 0 && i < ip) side[i] += e.u; else if (e.s === 1 && i > ip) side[i] += e.u; }
+  for (let i = 0; i < n; i++) { if (i < ip) below.push(i); else if (i > ip) above.push(i); }
+  const c = candles.map(x => x.c), r = [];
+  for (let i = 1; i < c.length; i++) r.push(Math.log(c[i] / c[i - 1]));
+  const mu = r.reduce((a, b) => a + b, 0) / r.length, sig = Math.sqrt(r.reduce((a, b) => a + (b - mu) ** 2, 0) / (r.length - 1)) * Math.sqrt(96);
+  const pT = (edge, days) => Math.min(1, 2 * (1 - normCdf(Math.abs(Math.log(edge / p)) / (sig * Math.sqrt(days)))));
+  const out = [];
+  for (const [cl, dir] of [[findClusters(side, below), -1], [findClusters(side, above), 1]]) {
+    if (!cl.length) continue;
+    const mx = Math.max(...cl.map(x => x.value));
+    const t = cl.filter(x => x.value >= 0.5 * mx).sort((a, b) => dir < 0 ? b.end - a.end : a.start - b.start)[0];
+    const lo = (b0 + t.start) * step, hi = (b0 + t.end + 1) * step, edge = dir < 0 ? hi : lo;
+    out.push({ coin, price: p, dir, lo, hi, usd: t.value, dist: (edge / p - 1) * 100, p1: pT(edge, 1), p7: pT(edge, 7) });
+  }
+  return out;
+}
+async function scanCoins() {
+  if (S.scan.busy || S.demo) return;
+  S.scan.busy = true; $('scanInfo').textContent = 'scanning…';
+  const rows = [], data = {};
+  for (const coin of SCAN_COINS) {
+    try {
+      const sym = coin + 'USDT';
+      const kl = await getJSON(`${BN}/fapi/v1/klines?symbol=${sym}&interval=15m&limit=500`);
+      const candles = kl.map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }));
+      const oi = await getJSON(`${BN}/futures/data/openInterestHist?symbol=${sym}&period=15m&limit=500`);
+      rows.push(...quickMap(candles, oi.map(x => ({ t: x.timestamp, v: +x.sumOpenInterest })), coin));
+      data[coin] = candles;
+    } catch (e) { S.scan.err++; console.warn('scan', coin, e.message); }
+    await new Promise(r => setTimeout(r, 120));
+  }
+  rows.sort((a, b) => b.p1 - a.p1 || b.usd - a.usd);
+  S.scan.rows = rows; S.scan.at = Date.now(); S.scan.busy = false;
+  // market context: BTC 24 h change and ETH↔BTC correlation of 15-min returns (last 2 days)
+  const B = data.BTC, E = data.ETH;
+  if (B && E && B.length > 200 && E.length > 200) {
+    const bm = new Map(B.map(k => [k.t, k.c])), pairs = [];
+    for (let i = E.length - 192; i < E.length; i++) { const t = E[i].t, tp = E[i - 1].t; if (bm.has(t) && bm.has(tp)) pairs.push([Math.log(E[i].c / E[i - 1].c), Math.log(bm.get(t) / bm.get(tp))]); }
+    const mx = pairs.reduce((a, p) => a + p[0], 0) / pairs.length, my = pairs.reduce((a, p) => a + p[1], 0) / pairs.length;
+    let sxy = 0, sxx = 0, syy = 0; for (const [x, y] of pairs) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; syy += (y - my) ** 2; }
+    S.scan.ctx = { btc24: (B[B.length - 1].c / B[B.length - 97].c - 1) * 100, btcPx: B[B.length - 1].c, corr: sxy / Math.sqrt(sxx * syy) };
+  }
+  renderScan();
+}
+function renderScan() {
+  const info = $('scanInfo'); if (!info) return;
+  if (S.demo) { info.textContent = 'off in demo mode (uses live Binance data)'; return; }
+  if (!S.scan.at) { if (!S.scan.busy) info.textContent = 'waiting…'; return; }
+  info.textContent = `same model as ETH, 15-min data from Binance · updated ${hhmmss(S.scan.at)} · refreshes every 5 min`;
+  $('rankBody').innerHTML = S.scan.rows.slice(0, 10).map((r, i) => `<tr class="${r.dir < 0 ? 'rk-dn' : 'rk-up'}"><td><span class="rk">${i + 1}</span> <b>${r.coin}</b><div class="muted">${fmtCoin(r.price)}</div></td>` +
+    `<td class="${r.dir < 0 ? 'neg' : 'pos'}">${r.dir < 0 ? '▼ long squeeze' : '▲ short squeeze'}</td><td>${fmtCoin(r.lo)}–${fmtCoin(r.hi)}</td><td>${fmtPct(r.dist)}</td><td>${fmtUsd(r.usd)}</td>` +
+    `<td><b>${fmtProb(r.p1)}</b></td><td>${fmtProb(r.p7)}</td></tr>`).join('');
 }
 
 /* ================= Tooltips ================= */
@@ -1572,6 +2022,13 @@ function bindTips() {
       placeTip(tip, ev);
     });
     cv.addEventListener('mouseleave', hide);
+    cv.addEventListener('click', ev => {
+      const v = S.views[V.id]; if (!v || !v.geom) return;
+      const r = cv.getBoundingClientRect(), i = Math.floor((ev.clientX - r.left - v.geom.padL) / v.geom.bw);
+      if (i < 0 || i >= v.n) return;
+      S.sel = { view: V.id, b: v.b0 + i };
+      renderInspector();
+    });
   }
   const hc = $('cvHeat');
   hc.addEventListener('mousemove', ev => {
@@ -1611,6 +2068,8 @@ function fillCfgForm() {
   $('vibrate').checked = !!cfg.vibrate; $('wake').checked = !!cfg.wake;
   updateSoundPill();
   $('cfgBurst').value = cfg.burstMin; $('cfgSweep').value = cfg.sweepMin;
+  $('cfgArm').value = cfg.armDist; $('cfgCascReal').value = cfg.cascadeMin; $('cfgCascModel').value = cfg.cascadeModel;
+  $('soundAll').checked = !!cfg.soundAll;
   $('optRange').value = String(cfg.optRange);
 }
 function bindUI() {
@@ -1620,7 +2079,8 @@ function bindUI() {
     if (cfg.sound) { unlockAudio(); playAlert('test'); }
     updateSoundPill();
   });
-  $('soundPill').addEventListener('click', () => { unlockAudio(); playAlert('approachUp'); });
+  $('soundPill').addEventListener('click', () => { unlockAudio(); playAlert('test'); });
+  $('soundAll').addEventListener('change', e => { cfg.soundAll = e.target.checked; saveCfg(); });
   $('vibrate').addEventListener('change', e => { cfg.vibrate = e.target.checked; saveCfg(); if (cfg.vibrate) vibrate('test'); });
   $('wake').addEventListener('change', e => {
     cfg.wake = e.target.checked; saveCfg();
@@ -1654,6 +2114,7 @@ function bindUI() {
     const w = $('cfgW').value.split(/[\/;,\s]+/).map(Number).filter(x => isFinite(x) && x >= 0);
     if (w.length === 5 && w.some(x => x > 0)) cfg.weights = w;
     cfg.burstMin = num('cfgBurst', DEFAULTS.burstMin) || DEFAULTS.burstMin; cfg.sweepMin = num('cfgSweep', DEFAULTS.sweepMin) || DEFAULTS.sweepMin;
+    cfg.armDist = num('cfgArm', DEFAULTS.armDist) || DEFAULTS.armDist; cfg.cascadeMin = num('cfgCascReal', DEFAULTS.cascadeMin) || DEFAULTS.cascadeMin; cfg.cascadeModel = num('cfgCascModel', DEFAULTS.cascadeModel) || DEFAULTS.cascadeModel;
     saveCfg(); fillCfgForm(); rebuild(); S.statusKey = ''; render();
   });
   $('btnReset').addEventListener('click', () => { cfg = defaults(); saveCfg(); fillCfgForm(); buildLegends(); rebuild(); render(); });
@@ -1722,6 +2183,7 @@ function startDemo() {
 /* ================= Start ================= */
 async function init() {
   bindUI();
+  prerenderSounds();
   if (cfg.wake) requestWake();
   setInterval(updateSoundPill, 2000);
   let demo = false;
@@ -1732,6 +2194,7 @@ async function init() {
   loadRsi(); setInterval(loadRsi, 60000);
   loadStats(); setInterval(loadStats, 60000);
   loadOptions(); setInterval(loadOptions, 120000);
+  setTimeout(scanCoins, 4000); setInterval(scanCoins, 300000);
   setInterval(render, 1000);
   await loadHistory();
   setInterval(loadHistory, 30 * 60000);
