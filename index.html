@@ -64,6 +64,12 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
 .banner{background:#3b1d1d;border:1px solid #7f1d1d;color:#fecaca;padding:8px 12px;border-radius:8px;margin-top:10px}
 .disc{font-size:11.5px;color:var(--muted);margin-top:14px}
 .tw{overflow-x:auto}
+.tsig{font-size:13px;font-weight:800;padding:3px 10px;border-radius:999px;background:#1f2937;color:#94a3b8;font-variant-numeric:tabular-nums}
+.tsig.long{background:#16a34a;color:#fff;box-shadow:0 0 12px rgba(34,197,94,.6)}.tsig.short{background:#dc2626;color:#fff;box-shadow:0 0 12px rgba(239,68,68,.6)}
+.pbar{display:grid;grid-template-columns:70px 1fr 46px;gap:8px;align-items:center;font-size:13px;margin-top:6px;font-variant-numeric:tabular-nums}
+.pbar .b{position:relative;height:12px;border-radius:6px;background:#1f2937}.pbar .b i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+.pbar .b i.l{background:#22c55e}.pbar .b i.s{background:#ef4444}.pbar .b u{position:absolute;top:-4px;bottom:-4px;width:3px;background:#fbbf24;border-radius:2px}
+tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
 @media (max-width:640px){table.bt td:nth-child(4),table.bt th:nth-child(4){display:none}table.bt td,table.bt th{padding:5px 3px;font-size:12.5px}table.bt td:first-child{font-size:12.5px}.tag{font-size:10px;padding:1px 5px}}
 @media (max-width:640px){.lv{grid-template-columns:1fr 1fr}.check{grid-template-columns:1fr}.decision .big{font-size:28px}.cvwrap{height:380px}.top .px{font-size:22px}}
 </style>
@@ -72,6 +78,7 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
 <div class="top">
   <span class="px" id="px">—</span>
   <span class="cd">15-min closes in <b id="cd">—</b></span>
+  <span id="topSig" class="tsig">—</span>
   <span class="right"><span><span class="dot" id="dWs"></span>live</span><a href="full.html">full radar →</a></span>
 </div>
 <div id="banner" class="banner" hidden></div>
@@ -83,18 +90,25 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
 </section>
 
 <section class="card">
-  <h2>15-min chart · Bollinger, EMA 21/50, VWAP, Fibonacci, MACD, RSI</h2>
-  <div class="cvwrap"><canvas id="cv"></canvas></div>
-</section>
-
-<section class="card">
   <h2>Checklist · <span id="ckSum"></span></h2>
   <div class="check" id="check"></div>
 </section>
 
 <section class="card">
+  <h2>15-min chart · Bollinger, EMA 21/50, VWAP, Fibonacci, MACD, RSI</h2>
+  <div class="cvwrap"><canvas id="cv"></canvas></div>
+</section>
+
+<section class="card">
   <h2>Key levels · chance to touch in the next hour</h2>
   <table><thead><tr><th>Level</th><th>Price</th><th>Dist.</th><th>Touch 1 h</th></tr></thead><tbody id="levels"></tbody></table>
+</section>
+
+<section class="card">
+  <h2>How much to trust · threshold picked from 30 days of history</h2>
+  <div id="pmInfo" class="note" style="margin-top:0"></div>
+  <div class="tw"><table class="bt"><thead><tr><th>Show signal at ≥</th><th>Signals / day</th><th>Win</th><th>Avg R</th><th>Total R</th></tr></thead><tbody id="thTable"></tbody></table></div>
+  <div class="note">Rows = the most recent ~6 days the model never trained on. Win = target (1.5 ATR) hit before stop (1 ATR) within 1 h; break-even win rate ≈ 40% plus costs.</div>
 </section>
 
 <section class="card">
@@ -108,7 +122,7 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
     <label><input type="checkbox" id="snd"> sound on a new setup</label>
     <button id="test">Test</button>
     <label>cost per trade (%) <input type="number" id="fee" step="0.01" min="0"></label>
-    <label><input type="checkbox" id="showUnproven"> also alert unproven strategies</label>
+    <label>min signals per day <input type="number" id="minPD" step="0.5" min="0.5"></label>
   </div>
 </section>
 
@@ -120,7 +134,7 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
 const BN = 'https://fapi.binance.com', T15 = 900000, DAY = 864e5;
 const $ = id => document.getElementById(id);
 const CFG_KEY = 'eth15m.v1';
-const cfg = (() => { const d = { snd: true, fee: 0.04, unproven: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { return d; } })();
+const cfg = (() => { const d = { snd: true, fee: 0.04, minPD: 3 }; try { return Object.assign(d, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { return d; } })();
 const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { } };
 const S = { k: [], oi: [], price: null, I: null, bt: null, book: null, hl: null, lastSetupT: 0, sigLog: [] };
 const fmt = (p, d = 2) => p == null || !isFinite(p) ? '—' : p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -352,22 +366,87 @@ function checklist(i) {
   if (S.oi.length > 8) { const a = S.oi[S.oi.length - 1].v, b = S.oi[S.oi.length - 5].v, ch = (a / b - 1) * 100, pr = (x.c / k[i - 4].c - 1) * 100; add('Open interest 1 h', ch > 0.3 && pr > 0 ? 1 : ch > 0.3 && pr < 0 ? -1 : 0, `${pct(ch)} with price ${pct(pr)}`); }
   return out;
 }
+/* ================= Probability model + threshold picked from history ================= */
+// For every past 15-min close: P(long trade wins) and P(short trade wins), where a trade = entry at the close,
+// stop 1 ATR, target 1.5 ATR, max 1 h. Inputs: the 11 checklist votes, the 8 strategy triggers and 10 shape/momentum numbers.
+// History split in time: first 60% trains the model, next 20% picks the threshold, last 20% is the honest test.
+const sigm = z => 1 / (1 + Math.exp(-z));
+function fitScaler(X) { const d = X[0].length, mu = new Array(d).fill(0), sd = new Array(d).fill(0); for (const x of X) for (let j = 0; j < d; j++) mu[j] += x[j] / X.length; for (const x of X) for (let j = 0; j < d; j++) sd[j] += (x[j] - mu[j]) ** 2 / X.length; return { mu, sd: sd.map(s => Math.sqrt(s) || 1) }; }
+const zs = (x, sc) => x.map((v, j) => clip((v - sc.mu[j]) / sc.sd[j], -5, 5));
+function trainLR(Z, y, iters = 400, lr = 0.2, l2 = 0.01) {
+  const n = Z.length, d = Z[0].length, w = new Float64Array(d + 1);
+  for (let it = 0; it < iters; it++) {
+    const g = new Float64Array(d + 1);
+    for (let i = 0; i < n; i++) { const z = Z[i]; let s = w[d]; for (let j = 0; j < d; j++) s += w[j] * z[j]; const e = sigm(s) - y[i]; for (let j = 0; j < d; j++) g[j] += e * z[j]; g[d] += e; }
+    for (let j = 0; j < d; j++) w[j] -= lr * (g[j] / n + l2 * w[j]); w[d] -= lr * g[d] / n;
+  }
+  return w;
+}
+const predLR = (w, z) => { let s = w[z.length]; for (let j = 0; j < z.length; j++) s += w[j] * z[j]; return sigm(s); };
+function featAt(I, k, i, om) {
+  const x = k[i], a = I.atr[i] || 1, pb = (x.c - I.bbL[i]) / ((I.bbU[i] - I.bbL[i]) || 1);
+  const o0 = om.get(x.t), o4 = om.get(k[i - 4].t), oiv = o0 && o4 && (o0 / o4 - 1) * 100 > 0.3 ? Math.sign(x.c - k[i - 4].c) : 0;
+  const votes = [I.e9[i] > I.e21[i] && I.e21[i] > I.e50[i] ? 1 : I.e9[i] < I.e21[i] && I.e21[i] < I.e50[i] ? -1 : 0, x.c > I.e200[i] ? 1 : -1, I.stDir[i],
+    I.adx[i] > 20 ? Math.sign(I.pdi[i] - I.mdi[i]) : 0, I.hist[i] > 0 && I.hist[i] > I.hist[i - 1] ? 1 : I.hist[i] < 0 && I.hist[i] < I.hist[i - 1] ? -1 : 0,
+    I.rsi[i] < 30 ? 1 : I.rsi[i] > 70 ? -1 : I.rsi[i] > 50 && I.rsi[i] > I.rsi[i - 1] ? 1 : I.rsi[i] < 50 && I.rsi[i] < I.rsi[i - 1] ? -1 : 0,
+    I.stK[i] > I.stD[i] && I.stK[i] < 80 ? 1 : I.stK[i] < I.stD[i] && I.stK[i] > 20 ? -1 : 0, pb < 0.1 ? 1 : pb > 0.9 ? -1 : 0, x.c > I.vwap[i] ? 1 : -1, Math.sign(I.cvd4[i]), oiv];
+  const strat = STRATS.map(s => s.f(I, i, k));
+  const cont = [I.rsi[i] / 100 - 0.5, (x.c - I.e21[i]) / a, I.hist[i] / a, pb - 0.5, I.adx[i] / 50, (x.c - k[i - 4].c) / a, I.cvd4[i] / Math.max(1, I.vAvg[i] * 4), (x.c - x.o) / a, (Math.min(x.o, x.c) - x.l) / a, (x.h - Math.max(x.o, x.c)) / a];
+  return votes.concat(strat, cont).map(v => isFinite(v) ? v : 0);
+}
+function trainProb() {
+  const k = S.k, I = S.I, om = new Map(S.oi.map(x => [x.t, x.v])), end = k.length - 1 - HOLD - 1;
+  const X = [], RL = [], RS = [];
+  for (let i = 230; i < end; i++) { X.push(featAt(I, k, i, om)); RL.push(simTrade(k, I, i, 1).R); RS.push(simTrade(k, I, i, -1).R); }
+  const n = X.length, a = Math.floor(n * 0.6), b = Math.floor(n * 0.8);
+  const sc = fitScaler(X.slice(0, a)), Z = X.map(x => zs(x, sc));
+  const wL = trainLR(Z.slice(0, a), RL.slice(0, a).map(r => r > 0 ? 1 : 0)), wS = trainLR(Z.slice(0, a), RS.slice(0, a).map(r => r > 0 ? 1 : 0));
+  const pL = Z.map(z => predLR(wL, z)), pS = Z.map(z => predLR(wS, z));
+  // trade the stronger side when it reaches th; no overlapping trades
+  const run = (from, to, th) => {
+    const R = []; let i = from;
+    while (i < to) {
+      const l = pL[i] >= th, s = pS[i] >= th;
+      const dir = l && (!s || pL[i] >= pS[i]) ? 1 : s ? -1 : 0;
+      if (!dir) { i++; continue; }
+      R.push(dir > 0 ? RL[i] : RS[i]); i += HOLD + 1;
+    }
+    const st = stats(R); return Object.assign(st, { perDay: R.length / ((to - from) / 96), tot: R.reduce((x, y) => x + y, 0) });
+  };
+  const grid = [];
+  for (let th = 0.30; th <= 0.701; th += 0.01) grid.push({ th: +th.toFixed(2), val: run(a, b, th), test: run(b, n, th) });
+  const ok = grid.filter(g => g.val.perDay >= cfg.minPD && g.val.n >= 6);
+  // pick: most total R on the validation slice among thresholds that still give ≥ minPD signals/day and positive average
+  const pick = ok.filter(g => g.val.avg > 0).sort((x, y) => y.val.tot - x.val.tot)[0] || ok.sort((x, y) => y.val.avg - x.val.avg)[0] || grid[0];
+  S.pm = { sc, wL, wS, th: pick.th, pick, grid, n, days: n / 96, edge: pick.val.avg > 0 && pick.test.avg > 0 };
+}
+function probNow(i) { const m = S.pm; if (!m) return null; const z = zs(featAt(S.I, S.k, i, new Map(S.oi.map(x => [x.t, x.v]))), m.sc); return { pL: predLR(m.wL, z), pS: predLR(m.wS, z) }; }
+function renderPM() {
+  const m = S.pm; if (!m) return;
+  const t = m.pick.test, v = m.pick.val, r2 = x => (x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(2));
+  $('pmInfo').innerHTML = `Auto threshold: <b class="yel">${Math.round(m.th * 100)}%</b> — the setting that made the most R on the validation days while still giving at least <b>${cfg.minPD}</b> signals/day. ` +
+    `On the final test days it gave <b>${t.perDay.toFixed(1)} signals/day</b>, win <b>${t.win == null ? '—' : Math.round(t.win * 100) + '%'}</b>, avg <b class="${t.avg > 0 ? 'pos' : 'neg'}">${r2(t.avg)} R</b> per trade (${t.n} trades). ` +
+    (m.edge ? '<span class="pos">Positive in both checks.</span>' : '<span class="neg">⚠ Not positive in both checks — treat signals as low conviction.</span>');
+  const rows = m.grid.filter(g => Math.abs(g.th - m.th) <= 0.08 + 1e-9 && Math.round(g.th * 100) % 2 === Math.round(m.th * 100) % 2);
+  $('thTable').innerHTML = rows.map(g => `<tr class="${g.th === m.th ? 'pick' : ''}"><td>${Math.round(g.th * 100)}%${g.th === m.th ? ' ← auto' : ''}</td><td>${g.test.perDay.toFixed(1)}</td><td>${g.test.win == null ? '—' : Math.round(g.test.win * 100) + '%'}</td><td>${r2(g.test.avg)}</td><td class="${g.test.tot > 0 ? 'pos' : 'neg'}">${r2(g.test.tot)}</td></tr>`).join('');
+}
 function decide() {
   const k = S.k, I = S.I, i = closedIndex(), p = S.price, a = I.atr[i];
   const fired = [];
   for (const r of S.bt) { const d = r.s.f(I, i, k); if (d) fired.push({ ...r, dir: d }); }
   const proven = fired.filter(f => f.on);
   const ck = checklist(i), score = ck.reduce((s, c) => s + c.vote, 0);
-  let dir = 0, use = [];
-  if (proven.length) {
-    const sL = proven.filter(f => f.dir > 0), sS = proven.filter(f => f.dir < 0);
-    if (sL.length && !sS.length && score >= 0) { dir = 1; use = sL; } else if (sS.length && !sL.length && score <= 0) { dir = -1; use = sS; }
-  }
+  // the model decides: the stronger side fires when its probability reaches the auto threshold
+  const P = probNow(i), th = S.pm ? S.pm.th : 1;
+  let dir = 0, use = fired.filter(f => true);
+  if (P) { if (P.pL >= th && P.pL >= P.pS) dir = 1; else if (P.pS >= th) dir = -1; }
+  use = fired.filter(f => f.dir === dir);
+  const PF = k[k.length - 1].t + T15 > Date.now() ? probNow(k.length - 1) : null;
   // preview on the forming candle (what fires if it closed now)
   const prev = [];
   if (k[k.length - 1].t + T15 > Date.now()) for (const r of S.bt) { const d = r.s.f(I, k.length - 1, k); if (d) prev.push({ ...r, dir: d }); }
   const mg = liqMagnets(), wl = walls();
-  return { i, p, a, fired, proven, use, dir, ck, score, prev, mg, wl };
+  return { i, p, a, fired, proven, use, dir, ck, score, prev, mg, wl, P, PF, th };
 }
 function render() {
   if (!S.k.length || !S.I) return;
@@ -383,13 +462,13 @@ function render() {
     if (D.mg) { const m = D.dir > 0 ? D.mg.up : D.mg.dn; if (m) cands.push({ px: m.px, nm: `liq. box ${usd(m.v)}` }); }
     if (D.wl) { const w = D.dir > 0 ? D.wl.ask : D.wl.bid; if (w) cands.push({ px: w.px, nm: `wall ${usd(w.v)}` }); }
     const t2 = cands.filter(c => D.dir * (c.px - tp1) > 0 && Math.abs(c.px - e) <= 4 * D.a).sort((x, y) => Math.abs(x.px - e) - Math.abs(y.px - e))[0];
-    const best = D.use.slice().sort((x, y) => y.b.pf - x.b.pf)[0];
+    const pp = D.dir > 0 ? D.P.pL : D.P.pS, tt = S.pm.pick.test;
     el.className = 'decision ' + (D.dir > 0 ? 'long' : 'short');
-    $('dBig').textContent = (D.dir > 0 ? '▲ LONG' : '▼ SHORT') + ' SETUP';
+    $('dBig').textContent = `${D.dir > 0 ? '▲ LONG' : '▼ SHORT'} · ${Math.round(pp * 100)}%`;
     $('dBody').innerHTML =
       `<div class="lv"><div><div class="t">Entry (close)</div><div class="v">${fmt(e)}</div></div><div><div class="t">Stop · 1 ATR</div><div class="v neg">${fmt(sl)}</div></div>` +
       `<div><div class="t">Target 1 · 1.5 ATR</div><div class="v pos">${fmt(tp1)}</div></div><div><div class="t">Target 2</div><div class="v pos">${t2 ? fmt(t2.px) : '—'}</div><div class="t">${t2 ? t2.nm : 'none in reach'}</div></div></div>` +
-      `<div><b>${D.use.map(u => u.s.name).join(' + ')}</b> — tested win ${Math.round(best.b.win * 100)}%, profit factor ${best.b.pf.toFixed(2)} on the last ${best.b.n} out-of-sample trades · ${agree}/${D.ck.length} indicators agree · hold max 1 h</div>` +
+      `<div>Chance the target comes before the stop within 1 h: <b>${Math.round(pp * 100)}%</b> (threshold ${Math.round(D.th * 100)}%; at this threshold the recent test won ${tt.win == null ? '—' : Math.round(tt.win * 100) + '%'}, avg ${tt.avg >= 0 ? '+' : ''}${tt.avg == null ? '—' : tt.avg.toFixed(2)} R) · ${agree}/${D.ck.length} indicators agree${D.use.length ? ' · strategies: <b>' + D.use.map(u => u.s.name).join(', ') + '</b>' : ''} · hold max 1 h</div>` +
       `<div class="why">${D.ck.filter(c => c.vote === D.dir).map(c => `<span class="chip ${D.dir > 0 ? 'on' : 'onr'}">✓ ${c.nm}</span>`).join('')}${D.ck.filter(c => c.vote === -D.dir).map(c => `<span class="chip off">✗ ${c.nm}</span>`).join('')}</div>`;
     if (S.lastSetupT !== S.k[D.i].t) { S.lastSetupT = S.k[D.i].t; alertSetup(D, e, sl, tp1); }
   } else {
@@ -397,12 +476,20 @@ function render() {
     $('dBig').textContent = 'WAIT';
     const firedTxt = D.fired.length ? D.fired.map(f => `<span class="chip ${f.on ? (f.dir > 0 ? 'on' : 'onr') : 'off'}">${f.dir > 0 ? '▲' : '▼'} ${f.s.name}${f.on ? '' : ' (not proven)'}</span>`).join('') : '<span class="muted">no strategy fired on the last close</span>';
     const prevTxt = D.prev.length ? D.prev.map(f => `<span class="chip ${f.on ? (f.dir > 0 ? 'on' : 'onr') : 'off'}">${f.dir > 0 ? '▲' : '▼'} ${f.s.name}${f.on ? '' : ' (not proven)'}</span>`).join('') : '<span class="muted">nothing</span>';
-    const blocked = D.proven.length ? `<div class="yel" style="margin-bottom:4px">A proven strategy fired (${D.proven.map(f => (f.dir > 0 ? '▲ ' : '▼ ') + f.s.name).join(', ')}) but the checklist disagrees or proven strategies conflict — filtered out.</div>` : '';
-    $('dBody').innerHTML = blocked + `<div>${D.proven.length ? 'No confirmed' : 'No proven'} setup on the last 15-min close. Bias from the checklist: <b class="${D.score > 0 ? 'pos' : D.score < 0 ? 'neg' : ''}">${D.score > 0 ? 'bullish' : D.score < 0 ? 'bearish' : 'neutral'} (${D.score > 0 ? '+' : ''}${D.score})</b>.</div>` +
-      `<div class="why" style="margin-top:8px"><span class="muted">Last close:</span> ${firedTxt}</div>` +
+    const lead = D.P ? (D.P.pL >= D.P.pS ? `LONG ${Math.round(D.P.pL * 100)}%` : `SHORT ${Math.round(D.P.pS * 100)}%`) : '—';
+    $('dBody').innerHTML = `<div>No side reached the ${Math.round(D.th * 100)}% threshold on the last close (strongest: <b>${lead}</b>). Checklist bias: <b class="${D.score > 0 ? 'pos' : D.score < 0 ? 'neg' : ''}">${D.score > 0 ? 'bullish' : D.score < 0 ? 'bearish' : 'neutral'} (${D.score > 0 ? '+' : ''}${D.score})</b>.</div>` +
+      `<div class="why" style="margin-top:8px"><span class="muted">Strategies on the last close:</span> ${firedTxt}</div>` +
       `<div class="why"><span class="muted">If this candle closed now:</span> ${prevTxt}</div>`;
-    if (cfg.unproven && D.fired.length && S.lastSetupT !== S.k[D.i].t) { S.lastSetupT = S.k[D.i].t; const f = D.fired[0], e = S.k[D.i].c; alertSetup({ dir: f.dir, use: [f], unproven: true, i: D.i }, e, e - f.dir * D.a, e + f.dir * TP_ATR * D.a); }
   }
+  // probability bars (last close and forming candle) with the threshold mark
+  if (D.P) {
+    const bar = (lbl, v, c) => `<div class="pbar"><span>${lbl}</span><div class="b"><i class="${c}" style="width:${Math.round(v * 100)}%"></i><u style="left:calc(${Math.round(D.th * 100)}% - 1px)"></u></div><b>${Math.round(v * 100)}%</b></div>`;
+    $('dBody').insertAdjacentHTML('beforeend', bar('LONG', D.P.pL, 'l') + bar('SHORT', D.P.pS, 's') +
+      (D.PF ? `<div class="note" style="margin-top:4px">forming candle (if it closed now): LONG ${Math.round(D.PF.pL * 100)}% · SHORT ${Math.round(D.PF.pS * 100)}%</div>` : ''));
+  }
+  const ts = $('topSig');
+  ts.className = 'tsig ' + (D.dir > 0 ? 'long' : D.dir < 0 ? 'short' : '');
+  ts.textContent = D.dir ? `${D.dir > 0 ? '▲ LONG' : '▼ SHORT'} ${Math.round((D.dir > 0 ? D.P.pL : D.P.pS) * 100)}%` : D.P ? `WAIT · L ${Math.round(D.P.pL * 100)}% / S ${Math.round(D.P.pS * 100)}% · need ${Math.round(D.th * 100)}%` : 'WAIT';
   const pos = clip((D.score / D.ck.length + 1) / 2, 0, 1);
   $('dBody').insertAdjacentHTML('beforeend', `<div class="meter"><span class="neg">bear</span><div class="bar"><i style="left:calc(${(pos * 100).toFixed(1)}% - 2px)"></i></div><span class="pos">bull</span><b>${D.score > 0 ? '+' : ''}${D.score}/${D.ck.length}</b></div>`);
   // checklist
@@ -514,8 +601,8 @@ function toast(dir, title, body) {
 }
 function alertSetup(D, e, sl, tp) {
   S.sigLog.push({ t: S.k[D.i] ? S.k[D.i].t : 0, dir: D.dir });
-  const names = D.use.map(u => u.s.name).join(' + ');
-  toast(D.dir, `${D.dir > 0 ? '▲ LONG' : '▼ SHORT'} SETUP${D.unproven ? ' (unproven)' : ''}`, `${names}<br>entry ${fmt(e)} · stop ${fmt(sl)} · TP1 ${fmt(tp)}`);
+  const names = (D.P ? `chance ${Math.round((D.dir > 0 ? D.P.pL : D.P.pS) * 100)}% (threshold ${Math.round(D.th * 100)}%)` : '') + (D.use.length ? ' · ' + D.use.map(u => u.s.name).join(' + ') : '');
+  toast(D.dir, `${D.dir > 0 ? '▲ LONG' : '▼ SHORT'} SETUP`, `${names}<br>entry ${fmt(e)} · stop ${fmt(sl)} · TP1 ${fmt(tp)}`);
   beep(D.dir > 0);
   try { if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) navigator.vibrate(D.dir > 0 ? [90, 60, 90, 60, 90] : [260, 120, 260]); } catch (er) { }
   document.title = `${D.dir > 0 ? '▲ LONG' : '▼ SHORT'} · ETH ${fmt(e, 0)}`; setTimeout(() => { document.title = 'ETH 15m Entry'; }, 60000);
@@ -523,12 +610,12 @@ function alertSetup(D, e, sl, tp) {
 ['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state !== 'running') actx.resume(); } catch (e) { } }, { passive: true }));
 
 /* ================= Start ================= */
-function onNewCandle() { S.I = indicators(S.k); backtest(); renderBT(); }
+function onNewCandle() { S.I = indicators(S.k); backtest(); renderBT(); trainProb(); renderPM(); }
 async function init() {
-  $('snd').checked = cfg.snd; $('fee').value = cfg.fee; $('showUnproven').checked = cfg.unproven;
+  $('snd').checked = cfg.snd; $('fee').value = cfg.fee; $('minPD').value = cfg.minPD;
   $('snd').onchange = e => { cfg.snd = e.target.checked; saveCfg(); };
   $('fee').onchange = e => { const v = parseFloat(e.target.value); cfg.fee = isFinite(v) && v >= 0 ? v : 0.04; saveCfg(); onNewCandle(); };
-  $('showUnproven').onchange = e => { cfg.unproven = e.target.checked; saveCfg(); };
+  $('minPD').onchange = e => { const v = parseFloat(e.target.value); cfg.minPD = isFinite(v) && v > 0 ? v : 3; saveCfg(); onNewCandle(); render(); };
   $('test').onclick = () => { cfg.snd = true; $('snd').checked = true; saveCfg(); toast(1, '▲ TEST', 'This is how a setup alert looks and sounds.'); beep(true); };
   try { await Promise.all([loadKlines(), loadOI()]); }
   catch (e) { $('banner').hidden = false; $('banner').textContent = 'Could not load Binance data: ' + e.message; return; }
