@@ -95,6 +95,19 @@ table.walls{margin-top:6px}table.walls td{padding:2px 6px;font-size:12px}table.w
 .sndtest{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
 .sndtest button{padding:3px 7px;font-size:11.5px}
 .ver{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#1e293b;color:#93c5fd;font-size:11px}
+.sig-main{border-radius:10px;padding:12px 14px;margin:8px 0}
+.sig-main .big{font-size:30px;font-weight:900;letter-spacing:.5px}
+.sig-main .lv{font-size:13px;margin-top:4px}.sig-main .why{font-size:12.5px;margin-top:6px}.sig-main .hon{font-size:11.5px;margin-top:6px;opacity:.8}
+.sig-main.neutral{background:#151d2e;color:#94a3b8;border:1px solid #243049}.sig-main.neutral .big{font-size:18px}
+.sig-main.up{background:linear-gradient(120deg,#15803d,#14532d);color:#f0fdf4;border:2px solid #4ade80;box-shadow:0 0 24px rgba(34,197,94,.35)}
+.sig-main.down{background:linear-gradient(120deg,#b91c1c,#7f1d1d);color:#fef2f2;border:2px solid #f87171;box-shadow:0 0 24px rgba(239,68,68,.35)}
+.sig-meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 16px}
+.pm{display:grid;grid-template-columns:120px 1fr 40px;gap:8px;align-items:center;font-size:12px;font-variant-numeric:tabular-nums}
+.pmb{position:relative;height:10px;background:#1f2937;border-radius:5px;overflow:visible}
+.pmb i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}.pmb i.u{background:#22c55e}.pmb i.d{background:#ef4444}
+.pmb b{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fbbf24}
+details.setup>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+details.setup>summary h2{margin:0}details.setup>summary .setup-sig{font-size:14px;padding:4px 10px;margin:0}
 .liveread{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:10px}
 .liveread h3{font-size:12.5px;margin:0 0 6px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.6px}
 .liveread ul{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
@@ -214,7 +227,7 @@ button:hover{background:#273449}
 </head>
 <body>
 <header>
-  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v6 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
+  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v7 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
   <div class="px"><span id="price">—</span><small id="pxsrc"></small></div>
   <div class="dots" id="dots">
     <span class="dot" id="dot-bnrest" title="waiting"><i></i>Binance REST</span>
@@ -231,6 +244,7 @@ button:hover{background:#273449}
   <div id="status" class="status neutral">NEUTRAL</div>
   <div id="statusDetail">Loading history…</div>
   <label class="chk"><input type="checkbox" id="sound"> sound (cascades only)</label>
+  <label class="chk"><input type="checkbox" id="focus"> focus: pop-ups only for ≥80% signals + cascades</label>
   <label class="chk"><input type="checkbox" id="soundAll"> sound on every alert</label>
   <label class="chk"><input type="checkbox" id="notify"> desktop notification</label>
   <label class="chk"><input type="checkbox" id="vibrate"> vibrate (phone)</label>
@@ -243,11 +257,17 @@ button:hover{background:#273449}
 <div id="toasts" class="toasts"></div>
 <div id="edgeGlow" class="edge"></div>
 
-<section class="card setup">
-  <div class="hhead"><h2>15-min setup · long or short</h2><span class="d">rule checklist on the 15-min candle + liquidity context · not investment advice</span></div>
-  <div id="setupHead" class="setup-sig neutral">Waiting for data…</div>
-  <div id="setupBody"></div>
+<section class="card sigcard">
+  <div class="hhead"><h2>Direction signal · next 30 min</h2><span class="d">shows LONG / SHORT only when the model's chance ≥ your threshold (Settings, default 80%) · model output, not investment advice</span></div>
+  <div id="sigHead" class="sig-main neutral">Training model…</div>
+  <div id="sigMeters" class="sig-meters"></div>
+  <div id="sigInfo" class="muted" style="font-size:11.5px;margin-top:6px"></div>
 </section>
+
+<details class="card setup">
+  <summary><h2>15-min rule checklist (secondary)</h2> <span id="setupHead" class="setup-sig neutral">Waiting for data…</span></summary>
+  <div id="setupBody"></div>
+</details>
 
 <section class="card">
   <div class="hhead"><h2>15-min candle target</h2><span class="d" id="candleInfo">target for the candle that is forming now · chances = touch before this candle closes</span></div>
@@ -344,6 +364,7 @@ button:hover{background:#273449}
       <label>Weights 5x/10x/25x/50x/100x (%)<input type="text" id="cfgW"></label>
       <label>Liquidation pop-up: min. per side in 30 s ($K)<input type="number" id="cfgBurst" step="50" min="10"></label>
       <label>Sweep alert: min. model liquidity taken ($M)<input type="number" id="cfgSweep" step="0.5" min="0.1"></label>
+      <label>Direction signal: show only at ≥ (%)<input type="number" id="cfgSig" step="1" min="50" max="99"></label>
       <label>Cascade armed: price within (% of ladder start)<input type="number" id="cfgArm" step="0.1" min="0.1"></label>
       <label>Cascade trigger: real liqs same side in 60 s ($K)<input type="number" id="cfgCascReal" step="50" min="10"></label>
       <label>Cascade trigger: model levels hit in 2 min ($M)<input type="number" id="cfgCascModel" step="0.5" min="0.1"></label>
@@ -376,7 +397,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 80, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -709,6 +730,7 @@ async function pollOI() {
   try {
     const j = await getJSON(`${BN}/fapi/v1/openInterest?symbol=ETHUSDT`, 8000);
     const v = +j.openInterest;
+    if (v > 0 && S.model) { const slot = Math.floor(Date.now() / T15) * T15; if (!S.model.oi.has(slot)) S.model.oi.set(slot, v); }   // keep the model's OI feature fed between retrains
     if (v > 0) { S.bnOIraw = v; S.bnOIAt = Date.now(); updateByScale(); S.oi = v; S.oiSrc = 'binance'; setDot('bnrest', 'ok', 'OI ' + hhmmss(Date.now())); }
   } catch (e) { setDot('bnrest', 'err', 'OI: ' + e.message); }
 }
@@ -1432,8 +1454,13 @@ Object.assign(ALERT_KINDS, {
   fullDown: { icon: '⬤', cls: 'down', side: 'FULL CASCADE · LONGS', buzz: .2, loud: 1.15, blips: [[0, 520, 520, .06, 0], [.08, 460, 460, .06, 0], [.16, 400, 400, .06, 0], [.24, 340, 340, .06, 0], [.32, 290, 290, .06, 0], [.42, 260, 240, .55, 1]] },
   fullUp:   { icon: '⬤', cls: 'up',   side: 'FULL CASCADE · SHORTS', buzz: .2, loud: 1.15, blips: [[0, 290, 290, .06, 0], [.08, 340, 340, .06, 0], [.16, 400, 400, .06, 0], [.24, 460, 460, .06, 0], [.32, 520, 520, .06, 0], [.42, 500, 540, .55, 1]] }
 });
+// High-confidence model signal: three quick identical chirps (rhythm unlike any cascade sound), rising for LONG, falling for SHORT.
+Object.assign(ALERT_KINDS, {
+  sigLong:  { icon: '▲', cls: 'up',   side: 'HIGH-CONFIDENCE LONG',  buzz: .1, loud: 1.1, blips: [[0, 400, 470, .09, 0], [.13, 400, 470, .09, 0], [.26, 400, 520, .2, 0]] },
+  sigShort: { icon: '▼', cls: 'down', side: 'HIGH-CONFIDENCE SHORT', buzz: .1, loud: 1.1, blips: [[0, 470, 400, .09, 0], [.13, 470, 400, .09, 0], [.26, 470, 350, .2, 0]] }
+});
 // Only these make sound / vibrate unless "sound on every alert" is ticked.
-const SOUND_KINDS = new Set(['cascadeDown', 'cascadeUp', 'halfDown', 'halfUp', 'fullDown', 'fullUp', 'test']);
+const SOUND_KINDS = new Set(['cascadeDown', 'cascadeUp', 'halfDown', 'halfUp', 'fullDown', 'fullUp', 'sigLong', 'sigShort', 'test']);
 function soundAllowed(kind) { return cfg.soundAll || SOUND_KINDS.has(kind); }
 function alertKind(k) {
   if (k.startsWith('LIQUIDITY GRAB BELOW')) return 'grabDown';
@@ -1565,6 +1592,11 @@ function fireAlert(kind, title, detail, opts) {
   if (kind !== 'test' && now - (S.lastAlertAt[kind] || 0) < (opts.cooldown || 30000)) return false;   // cooldown per alert type
   S.lastAlertAt[kind] = now;
   const A = ALERT_KINDS[kind];
+  // "focus mode": only high-confidence signals and cascades pop up; everything else goes to the event log quietly
+  if (cfg.focus && !SOUND_KINDS.has(kind)) {
+    logAlert(kind, A.side); logEvent(A.cls, `<b>${esc(A.side)}</b> — ${esc(title)}. ${esc(detail)}`);
+    return true;
+  }
   playAlert(kind);
   if (soundAllowed(kind)) vibrate(A.cls);
   showToast(kind, title, detail);
@@ -1775,6 +1807,7 @@ function render() {
     step('walls', () => { S.walls = computeWalls(); });
     step('market', () => { S.mc = marketCalc(); });
     step('setup', renderSetup);
+    step('signal', renderSignal);
     step('candle', renderCandle);
     step('first', renderFirst);
     step('inspector', renderInspector);
@@ -2340,6 +2373,196 @@ function drawCandleChart(mc, ct) {
   for (let i = 0; i < ks.length; i += 6) ctx.fillText(new Date(ks[i].t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), X(i) + cw / 2, H - 5);
 }
 
+/* ================= Directional signal model (calibrated, walk-forward) ================= */
+// Question it answers, for the next 30 min after a 15-min close:
+//   LONG  win = price hits +0.5 ATR before −0.5 ATR within 2 candles;  SHORT win = the mirror.
+// Two logistic regressions trained on ~30 days of Binance 15-min candles + open interest.
+// Honesty: the last 30% of history is held out and the card shows how often the model was right
+// whenever it said ≥ threshold. Published studies find ~54–57% accuracy at this horizon — 80% will be rare.
+const SIG_K = 0.5, SIG_H = 2;
+const FEAT_NAMES = ['15m RSI level', '15m RSI change', 'candle body (signed)', 'lower wick', 'upper wick', 'last candle return', '1 h return', '4 h return',
+  'distance to VWAP 24 h', 'taker delta (last candle)', 'taker delta (1 h)', 'volume spike', 'OI change 15 min', 'OI change 1 h', '1 h RSI (approx.)', 'volatility regime',
+  'time of day (sin)', 'time of day (cos)', 'room to 24 h high', 'room to 24 h low'];
+S.model = null; S.sigLog = []; S.sigStats = { win: 0, loss: 0, exp: 0 };
+const clip = (x, a, b) => Math.max(a, Math.min(b, x));
+async function loadTrainData() {
+  const k1 = await getJSON(`${BN}/fapi/v1/klines?symbol=ETHUSDT&interval=15m&limit=1500`, 15000);
+  let rows = k1;
+  try { const k2 = await getJSON(`${BN}/fapi/v1/klines?symbol=ETHUSDT&interval=15m&limit=1500&endTime=${k1[0][0] - 1}`, 15000); rows = k2.concat(k1); } catch (e) { }
+  const k = rows.map(x => ({ t: x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5], tb: +x[9] }));
+  const oi = new Map(); let end = null;
+  for (let pg = 0; pg < 6; pg++) {
+    try {
+      const j = await getJSON(`${BN}/futures/data/openInterestHist?symbol=ETHUSDT&period=15m&limit=500${end ? '&endTime=' + end : ''}`, 15000);
+      if (!Array.isArray(j) || !j.length) break;
+      for (const x of j) oi.set(x.timestamp, +x.sumOpenInterest);
+      end = Math.min(...j.map(x => x.timestamp)) - 1;
+    } catch (e) { break; }
+  }
+  return { k, oi };
+}
+// features at candle i (only data known at the close of candle i; OI is lagged one period to avoid look-ahead)
+function featureSeries(k, oi, liveOI) {
+  const n = k.length, c = k.map(x => x.c), rsi = wilderRsi(c, 14), rsiL = wilderRsi(c, 56), atr = atrSeries(k), F = new Array(n).fill(null);
+  const oiAt = (j, live) => live && j === n - 1 && liveOI ? liveOI : oi.get(k[j].t);
+  for (let i = 100; i < n; i++) {
+    const a = atr[i]; if (!(a > 0)) continue;
+    const x = k[i], rng = (x.h - x.l) || 1e-9, aR = a / x.c;
+    let pv = 0, vv = 0, vs2 = 0, hi = -Infinity, lo = Infinity, dv4 = 0, v4 = 0, am = 0;
+    for (let j = i - 95; j <= i; j++) { const y = k[j]; pv += (y.h + y.l + y.c) / 3 * y.v; vv += y.v; vs2 += y.v * y.v; hi = Math.max(hi, y.h); lo = Math.min(lo, y.l); am += atr[j] || a; }
+    for (let j = i - 3; j <= i; j++) { dv4 += 2 * k[j].tb - k[j].v; v4 += k[j].v; }
+    const vm = vv / 96, vsd = Math.sqrt(Math.max(1e-9, vs2 / 96 - vm * vm));
+    const o0 = oiAt(i - 1), o1 = oiAt(i - 2), o4 = oiAt(i - 5);
+    const d = new Date(x.t + T15), hr = d.getUTCHours() + d.getUTCMinutes() / 60;
+    F[i] = [rsi[i] / 100 - 0.5, (rsi[i] - rsi[i - 1]) / 10, (x.c - x.o) / rng, (Math.min(x.o, x.c) - x.l) / rng, (x.h - Math.max(x.o, x.c)) / rng,
+      Math.log(x.c / k[i - 1].c) / aR, Math.log(x.c / k[i - 4].c) / aR, Math.log(x.c / k[i - 16].c) / aR,
+      (x.c - pv / vv) / a, (2 * x.tb - x.v) / Math.max(1e-9, x.v), dv4 / Math.max(1e-9, v4), clip((x.v - vm) / vsd, -4, 4),
+      o0 && o1 ? (o0 / o1 - 1) * 100 : 0, o0 && o4 ? (o0 / o4 - 1) * 100 : 0, rsiL[i] / 100 - 0.5, a / (am / 96) - 1,
+      Math.sin(2 * Math.PI * hr / 24), Math.cos(2 * Math.PI * hr / 24), (hi - x.c) / a, (x.c - lo) / a].map(v => isFinite(v) ? v : 0);
+  }
+  return { F, atr };
+}
+function labelAt(k, i, a, dir) {
+  const e = k[i].c, tp = e + dir * SIG_K * a, sl = e - dir * SIG_K * a;
+  for (let j = i + 1; j <= i + SIG_H && j < k.length; j++) {
+    const y = k[j];
+    if (dir > 0 ? y.l <= sl : y.h >= sl) return 0;      // stop first (same-candle ties count as a loss)
+    if (dir > 0 ? y.h >= tp : y.l <= tp) return 1;
+  }
+  return 0;
+}
+const sigm = z => 1 / (1 + Math.exp(-z));
+function fitScaler(X) {
+  const d = X[0].length, mu = new Array(d).fill(0), sd = new Array(d).fill(0);
+  for (const x of X) for (let j = 0; j < d; j++) mu[j] += x[j] / X.length;
+  for (const x of X) for (let j = 0; j < d; j++) sd[j] += (x[j] - mu[j]) ** 2 / X.length;
+  return { mu, sd: sd.map(s => Math.sqrt(s) || 1) };
+}
+const zs = (x, sc) => x.map((v, j) => clip((v - sc.mu[j]) / sc.sd[j], -5, 5));
+function trainLR(Z, y, iters = 500, lr = 0.2, l2 = 0.003) {
+  const n = Z.length, d = Z[0].length, w = new Float64Array(d + 1);
+  for (let it = 0; it < iters; it++) {
+    const g = new Float64Array(d + 1);
+    for (let i = 0; i < n; i++) { const z = Z[i]; let s = w[d]; for (let j = 0; j < d; j++) s += w[j] * z[j]; const e = sigm(s) - y[i]; for (let j = 0; j < d; j++) g[j] += e * z[j]; g[d] += e; }
+    for (let j = 0; j < d; j++) w[j] -= lr * (g[j] / n + l2 * w[j]);
+    w[d] -= lr * g[d] / n;
+  }
+  return w;
+}
+const predLR = (w, z) => { let s = w[z.length]; for (let j = 0; j < z.length; j++) s += w[j] * z[j]; return sigm(s); };
+function evalBuckets(p, y) {
+  const out = {};
+  for (const th of [0.5, 0.6, 0.7, 0.8]) { let n = 0, h = 0; p.forEach((v, i) => { if (v >= th) { n++; h += y[i]; } }); out[th] = { n, hit: n ? h / n : null }; }
+  out.base = y.reduce((a, b) => a + b, 0) / y.length; out.max = Math.max(...p);
+  return out;
+}
+async function trainModel() {
+  if (S.demo || S.training) return;
+  S.training = true; $('sigInfo').textContent = 'training on ~30 days of 15-min data…';
+  try {
+    const { k, oi } = await loadTrainData();
+    const { F, atr } = featureSeries(k, oi);
+    const idx = []; for (let i = 100; i < k.length - SIG_H; i++) if (F[i]) idx.push(i);
+    const X = idx.map(i => F[i]), yL = idx.map(i => labelAt(k, i, atr[i], 1)), yS = idx.map(i => labelAt(k, i, atr[i], -1));
+    // walk-forward check: train on the first 70%, test on the last 30%
+    const cut = Math.floor(X.length * 0.7);
+    const sc1 = fitScaler(X.slice(0, cut)), Z1 = X.map(x => zs(x, sc1));
+    const wL1 = trainLR(Z1.slice(0, cut), yL.slice(0, cut)), wS1 = trainLR(Z1.slice(0, cut), yS.slice(0, cut));
+    const pL = Z1.slice(cut).map(z => predLR(wL1, z)), pS = Z1.slice(cut).map(z => predLR(wS1, z));
+    const evL = evalBuckets(pL, yL.slice(cut)), evS = evalBuckets(pS, yS.slice(cut));
+    // final model on everything
+    const sc = fitScaler(X), Z = X.map(x => zs(x, sc));
+    S.model = { sc, wL: trainLR(Z, yL), wS: trainLR(Z, yS), evL, evS, n: X.length, nTest: X.length - cut, days: (k[k.length - 1].t - k[0].t) / DAY, at: Date.now(), oi };
+  } catch (e) { $('sigInfo').textContent = 'model training failed: ' + e.message; console.warn('train', e); }
+  S.training = false;
+}
+function modelPredict(useForming) {
+  const m = S.model, kl = k15Live(); if (!m || kl.length < 120) return null;
+  const k = useForming ? kl : kl.slice(0, -1);
+  const { F, atr } = featureSeries(k, m.oi, useForming ? (S.bnOIraw || null) : null);
+  const i = k.length - 1; if (!F[i]) return null;
+  const z = zs(F[i], m.sc);
+  const pL = predLR(m.wL, z), pS = predLR(m.wS, z);
+  const contrib = w => z.map((v, j) => [FEAT_NAMES[j], w[j] * v, F[i][j]]).sort((a, b) => b[1] - a[1]);
+  return { pL, pS, atr: atr[i], t: k[i].t, cL: contrib(m.wL), cS: contrib(m.wS), forming: useForming };
+}
+function evalSignals() {
+  const now = Date.now(), p = S.price; if (!p) return;
+  for (const s of S.sigLog) {
+    if (s.res) continue;
+    if (s.dir > 0 ? p <= s.sl : p >= s.sl) s.res = 'loss';
+    else if (s.dir > 0 ? p >= s.tp : p <= s.tp) s.res = 'win';
+    else if (now > s.until) s.res = 'expired';
+    if (s.res) {
+      S.sigStats[s.res === 'win' ? 'win' : s.res === 'loss' ? 'loss' : 'exp']++;
+      logEvent(s.dir > 0 ? 'up' : 'down', `Signal ${s.dir > 0 ? 'LONG' : 'SHORT'} ${Math.round(s.p * 100)}% from $${fmtPx(s.entry)} → <b>${s.res === 'win' ? 'TARGET HIT ✔' : s.res === 'loss' ? 'STOP HIT ✘' : 'expired (30 min) ·'}</b> · session ${S.sigStats.win}W / ${S.sigStats.loss}L / ${S.sigStats.exp} expired.`);
+    }
+  }
+}
+const REASON_TXT = (name, raw, dir) => {
+  const up = dir > 0;
+  switch (name) {
+    case 'taker delta (last candle)': case 'taker delta (1 h)': return raw > 0 ? 'aggressive buyers dominating' : 'aggressive sellers dominating';
+    case 'lower wick': return 'long lower wick (buyers rejected the low)';
+    case 'upper wick': return 'long upper wick (sellers rejected the high)';
+    case 'volume spike': return raw > 0 ? 'volume above normal' : 'quiet volume';
+    case 'OI change 15 min': case 'OI change 1 h': return raw > 0 ? 'open interest rising (new positions)' : 'open interest falling (positions closing)';
+    case 'distance to VWAP 24 h': return raw < 0 ? `price ${Math.abs(raw).toFixed(1)} ATR below VWAP` : `price ${raw.toFixed(1)} ATR above VWAP`;
+    case '15m RSI level': return `15m RSI ${(raw * 100 + 50).toFixed(0)}`;
+    case '1 h RSI (approx.)': return `1h RSI ${(raw * 100 + 50).toFixed(0)}`;
+    case '15m RSI change': return raw > 0 ? '15m RSI rising' : '15m RSI falling';
+    case 'candle body (signed)': return raw > 0 ? 'green candle body' : 'red candle body';
+    case 'last candle return': case '1 h return': case '4 h return': return `${name} ${raw > 0 ? 'up' : 'down'} ${Math.abs(raw).toFixed(1)} ATR`;
+    case 'room to 24 h high': return `${raw.toFixed(1)} ATR below the 24 h high`;
+    case 'room to 24 h low': return `${raw.toFixed(1)} ATR above the 24 h low`;
+    case 'volatility regime': return raw > 0 ? 'volatility above normal' : 'volatility below normal';
+    default: return name;
+  }
+};
+function renderSignal() {
+  const card = $('sigHead'); if (!card) return;
+  if (S.demo) { card.className = 'sig-main neutral'; card.innerHTML = 'Signal model is off in demo mode (needs live Binance history).'; return; }
+  const m = S.model;
+  if (!m) { if (!S.training) $('sigInfo').textContent = 'waiting for training data…'; return; }
+  evalSignals();
+  const thr = cfg.sigThr / 100;
+  const closed = modelPredict(false), form = modelPredict(true);
+  if (!closed) return;
+  const now = Date.now(), slotEnd = Math.floor(now / T15) * T15 + T15, elapsed = 1 - (slotEnd - now) / T15;
+  // official = last closed candle; preview = forming candle once ≥ 2/3 of it has printed
+  const cand = [{ src: 'closed', r: closed }];
+  if (form && elapsed >= 2 / 3) cand.push({ src: 'forming', r: form });
+  let best = null;
+  for (const c of cand) for (const [dir, pp] of [[1, c.r.pL], [-1, c.r.pS]]) if (pp >= thr && (!best || pp > best.p)) best = { dir, p: pp, r: c.r, src: c.src };
+  const ev = d => d > 0 ? m.evL : m.evS;
+  const honest = d => { const e = ev(d)[0.8], e7 = ev(d)[0.7]; return `held-out test (${m.nTest} candles): when ${d > 0 ? 'LONG' : 'SHORT'} ≥80% → ${e.n ? Math.round(e.hit * 100) + '% right (n=' + e.n + ')' : 'never reached'} · ≥70% → ${e7.n ? Math.round(e7.hit * 100) + '% (n=' + e7.n + ')' : 'never'} · base rate ${Math.round(ev(d).base * 100)}%`; };
+  if (best) {
+    const p = S.price, a = best.r.atr, tp = p + best.dir * SIG_K * a, sl = p - best.dir * SIG_K * a;
+    const reasons = (best.dir > 0 ? best.r.cL : best.r.cS).filter(([nm, c]) => !nm.startsWith('time of day') && c > 0).slice(0, 3).map(([nm, , raw]) => REASON_TXT(nm, raw, best.dir));
+    card.className = 'sig-main ' + (best.dir > 0 ? 'up' : 'down');
+    card.innerHTML = `<div class="big">${best.dir > 0 ? '▲ LONG' : '▼ SHORT'} · ${Math.round(best.p * 100)}%</div>` +
+      `<div class="lv">entry ≈ <b>$${fmtPx(p)}</b> · target <b>$${fmtPx(tp)}</b> (${fmtPct((tp / p - 1) * 100)}) · stop <b>$${fmtPx(sl)}</b> (${fmtPct((sl / p - 1) * 100)}) · window 30 min · ${best.src === 'closed' ? 'from the last closed 15-min candle' : 'preview from the forming candle (' + Math.round(elapsed * 100) + '% printed)'}</div>` +
+      `<div class="why">Why: ${reasons.map(esc).join(' · ')}</div><div class="hon">${honest(best.dir)}</div>`;
+    const key = best.r.t + ':' + best.dir;
+    if (S.lastSigKey !== key) {
+      S.lastSigKey = key;
+      S.sigLog.push({ t: now, dir: best.dir, p: best.p, entry: p, tp, sl, until: now + SIG_H * T15 });
+      fireAlert(best.dir > 0 ? 'sigLong' : 'sigShort', `${best.dir > 0 ? 'LONG' : 'SHORT'} ${Math.round(best.p * 100)}% · target $${fmtPx(tp)} · stop $${fmtPx(sl)}`,
+        `30-min window · ${reasons.join(' · ')}`, { cooldown: 600000 });
+    }
+  } else {
+    card.className = 'sig-main neutral';
+    const mx = Math.max(closed.pL, closed.pS, form ? Math.max(form.pL, form.pS) : 0);
+    card.innerHTML = `<div class="big">NO SIGNAL ≥ ${cfg.sigThr}%</div><div class="lv">The model only shows a direction when its chance reaches your threshold. Highest right now: ${Math.round(mx * 100)}%.</div>`;
+  }
+  const bar = (lbl, v, cls) => `<div class="pm"><span>${lbl}</span><div class="pmb"><i class="${cls}" style="width:${Math.round(v * 100)}%"></i><b style="left:${cfg.sigThr}%"></b></div><span>${Math.round(v * 100)}%</span></div>`;
+  $('sigMeters').innerHTML = bar('LONG (closed)', closed.pL, 'u') + bar('SHORT (closed)', closed.pS, 'd') +
+    (form ? bar('LONG (forming)', form.pL, 'u') + bar('SHORT (forming)', form.pS, 'd') : '');
+  const ss = S.sigStats, done = ss.win + ss.loss;
+  $('sigInfo').innerHTML = `model trained ${hhmmss(m.at)} on ${m.n} candles (${m.days.toFixed(0)} days) · outcome: ±${SIG_K} ATR within 30 min (target before stop) · ` +
+    `${honest(1)} · ${honest(-1)} · this session: ${ss.win} wins / ${ss.loss} losses / ${ss.exp} expired${done ? ` (${Math.round(ss.win / done * 100)}%)` : ''}`;
+}
+
 /* ================= Tooltips ================= */
 function placeTip(tip, ev) {
   tip.style.display = 'block';
@@ -2414,8 +2637,9 @@ function fillCfgForm() {
   $('vibrate').checked = !!cfg.vibrate; $('wake').checked = !!cfg.wake;
   updateSoundPill();
   $('cfgBurst').value = cfg.burstMin; $('cfgSweep').value = cfg.sweepMin;
+  $('cfgSig').value = cfg.sigThr;
   $('cfgArm').value = cfg.armDist; $('cfgCascReal').value = cfg.cascadeMin; $('cfgCascModel').value = cfg.cascadeModel;
-  $('soundAll').checked = !!cfg.soundAll;
+  $('soundAll').checked = !!cfg.soundAll; $('focus').checked = !!cfg.focus;
   $('optRange').value = String(cfg.optRange);
 }
 function bindUI() {
@@ -2431,6 +2655,7 @@ function bindUI() {
     unlockAudio(); playAlert(b.dataset.snd); vibrate(ALERT_KINDS[b.dataset.snd].cls);
   }));
   $('soundAll').addEventListener('change', e => { cfg.soundAll = e.target.checked; saveCfg(); });
+  $('focus').addEventListener('change', e => { cfg.focus = e.target.checked; saveCfg(); });
   $('vibrate').addEventListener('change', e => { cfg.vibrate = e.target.checked; saveCfg(); if (cfg.vibrate) vibrate('test'); });
   $('wake').addEventListener('change', e => {
     cfg.wake = e.target.checked; saveCfg();
@@ -2464,6 +2689,7 @@ function bindUI() {
     const w = $('cfgW').value.split(/[\/;,\s]+/).map(Number).filter(x => isFinite(x) && x >= 0);
     if (w.length === 5 && w.some(x => x > 0)) cfg.weights = w;
     cfg.burstMin = num('cfgBurst', DEFAULTS.burstMin) || DEFAULTS.burstMin; cfg.sweepMin = num('cfgSweep', DEFAULTS.sweepMin) || DEFAULTS.sweepMin;
+    cfg.sigThr = clip(num('cfgSig', DEFAULTS.sigThr) || DEFAULTS.sigThr, 50, 99);
     cfg.armDist = num('cfgArm', DEFAULTS.armDist) || DEFAULTS.armDist; cfg.cascadeMin = num('cfgCascReal', DEFAULTS.cascadeMin) || DEFAULTS.cascadeMin; cfg.cascadeModel = num('cfgCascModel', DEFAULTS.cascadeModel) || DEFAULTS.cascadeModel;
     saveCfg(); fillCfgForm(); rebuild(); S.statusKey = ''; render();
   });
@@ -2551,6 +2777,7 @@ async function init() {
   loadOptions(); setInterval(loadOptions, 120000);
   setTimeout(scanCoins, 4000); setInterval(scanCoins, 300000);
   loadBooks(); setInterval(loadBooks, 15000);
+  setTimeout(trainModel, 6000); setInterval(trainModel, 3600e3);
   setInterval(render, 1000);
   await loadHistory();
   setInterval(loadHistory, 30 * 60000);
