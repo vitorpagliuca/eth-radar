@@ -95,6 +95,21 @@ table.walls{margin-top:6px}table.walls td{padding:2px 6px;font-size:12px}table.w
 .sndtest{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
 .sndtest button{padding:3px 7px;font-size:11.5px}
 .ver{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#1e293b;color:#93c5fd;font-size:11px}
+.dbar{position:sticky;top:0;z-index:35;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:8px 12px;margin:0 -4px 10px;border-radius:10px;background:rgba(10,14,22,.94);border:1px solid #2b3a57;backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,.45);font-size:13px}
+.dbar .dpx{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.dbar .dk{color:#cbd5e1;font-variant-numeric:tabular-nums}.dbar .dk small{color:#64748b}.dbar .dk b{font-size:14px}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.3px}
+.pill.up{background:#16a34a;color:#fff;box-shadow:0 0 14px rgba(34,197,94,.6)}.pill.down{background:#dc2626;color:#fff;box-shadow:0 0 14px rgba(239,68,68,.6)}
+.pill.neutral{background:#1f2937;color:#94a3b8}.pill.warn{background:#ea580c;color:#fff}.pill.warnc{background:#3d3210;color:#fde68a}
+.model-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.model-grid h3,.sigcard h3{font-size:12px;margin:0 0 4px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.6px}
+.cvwrap.short{height:200px}
+.mini{font-size:11px;margin-top:4px}
+table.ev tr.evp td{color:#d1fae5}table.ev tr.evn td{color:#8b98b2}table.ev tr.top td{background:#0f2e1c;font-weight:700}
+.bigprints{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px;font-variant-numeric:tabular-nums}
+.bigprints .bp{background:#151d2e;border-radius:5px;padding:2px 7px}
+.sigcard{border:1px solid #3b4a6b}
+@media (max-width:900px){.model-grid{grid-template-columns:1fr}.dbar{font-size:12px}.dbar .dpx{font-size:17px}}
 .sig-main{border-radius:10px;padding:12px 14px;margin:8px 0}
 .sig-main .big{font-size:30px;font-weight:900;letter-spacing:.5px}
 .sig-main .lv{font-size:13px;margin-top:4px}.sig-main .why{font-size:12.5px;margin-top:6px}.sig-main .hon{font-size:11.5px;margin-top:6px;opacity:.8}
@@ -227,7 +242,7 @@ button:hover{background:#273449}
 </head>
 <body>
 <header>
-  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v8 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
+  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v9 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
   <div class="px"><span id="price">—</span><small id="pxsrc"></small></div>
   <div class="dots" id="dots">
     <span class="dot" id="dot-bnrest" title="waiting"><i></i>Binance REST</span>
@@ -239,6 +254,7 @@ button:hover{background:#273449}
     <span class="dot" id="dot-byopt" title="waiting"><i></i>Bybit options</span>
   </div>
 </header>
+<div id="dbar" class="dbar"><span class="muted">Loading…</span></div>
 <div id="banner" class="banner" hidden></div>
 <div class="statusbar">
   <div id="status" class="status neutral">NEUTRAL</div>
@@ -262,6 +278,15 @@ button:hover{background:#273449}
   <div id="sigHead" class="sig-main neutral">Training model…</div>
   <div id="sigMeters" class="sig-meters"></div>
   <div id="sigInfo" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+  <div class="model-grid">
+    <div><h3>Model edge over time · last 2 h</h3><div class="cvwrap short"><canvas id="cvEdge"></canvas></div>
+      <div class="muted mini">thick = Kalman-smoothed P(long wins) green / P(short wins) red · thin = raw · shaded = edge (long − short) · blue dots = order-book imbalance ±1% · yellow = your alert threshold</div></div>
+    <div><h3>Why · gradient-tree + logistic ensemble</h3><div class="cvwrap short"><canvas id="cvContrib"></canvas></div>
+      <div class="muted mini">each bar = how much that input moves the log-odds of the leading side now (150 boosted trees + logistic regression, averaged)</div></div>
+  </div>
+  <h3 style="margin-top:10px">Ranked entries · expected value</h3>
+  <div class="feedwrap" style="max-height:none"><table class="feed ev"><thead><tr><th>#</th><th>Entry</th><th>Win chance</th><th>Target / stop</th><th>Hold</th><th>EV per trade</th><th>EV per hour</th></tr></thead><tbody id="evBody"></tbody></table></div>
+  <div class="muted mini">EV = chance × target − (1 − chance) × stop − round-trip cost (Settings). Positive EV is the only kind worth considering; "neutral odds" rows show that without an edge the EV is about zero minus costs.</div>
 </section>
 
 <details class="card setup">
@@ -277,6 +302,22 @@ button:hover{background:#273449}
     <div><table class="feed lvl"><thead><tr><th>Level within reach</th><th>Price</th><th>Dist.</th><th>Touch before close</th></tr></thead><tbody id="candleLevels"></tbody></table>
       <div id="candleStats" class="muted" style="font-size:11.5px;margin-top:6px"></div></div>
   </div>
+</section>
+
+<section class="card">
+  <div class="hhead"><h2>Live trade flow · who is hitting the market</h2><span class="d">every Binance ETHUSDT trade, live · green = aggressive buyers, red = aggressive sellers</span></div>
+  <div class="stats" id="flowStats"></div>
+  <div class="model-grid" style="margin-top:8px">
+    <div><h3>Trade arrival heatmap · size × minute</h3><div class="cvwrap short"><canvas id="cvFlow"></canvas></div></div>
+    <div><h3>Flow phase portrait · last 45 min</h3><div class="cvwrap short"><canvas id="cvPhase"></canvas></div>
+      <div class="muted mini">each point = one minute: x = net aggressive $ (buy − sell), y = price change · the dot is the current minute</div></div>
+  </div>
+  <div class="bigprints" id="bigPrints"></div>
+</section>
+
+<section class="card">
+  <div class="hhead"><h2>Decision trace · every 15-min close</h2><span class="d">what the model said at each close and what happened</span></div>
+  <div class="feedwrap" style="max-height:260px"><table class="feed"><thead><tr><th>Close</th><th>P long</th><th>P short</th><th>Decision</th><th>EV</th><th>Outcome</th></tr></thead><tbody id="traceBody"></tbody></table></div>
 </section>
 
 <section class="card">
@@ -365,6 +406,7 @@ button:hover{background:#273449}
       <label>Liquidation pop-up: min. per side in 30 s ($K)<input type="number" id="cfgBurst" step="50" min="10"></label>
       <label>Sweep alert: min. model liquidity taken ($M)<input type="number" id="cfgSweep" step="0.5" min="0.1"></label>
       <label>Direction signal: show only at ≥ (%)<input type="number" id="cfgSig" step="1" min="50" max="99"></label>
+      <label>Round-trip cost for EV (% of price: fees + spread)<input type="number" id="cfgFee" step="0.01" min="0"></label>
       <label>Cascade armed: price within (% of ladder start)<input type="number" id="cfgArm" step="0.1" min="0.1"></label>
       <label>Cascade trigger: real liqs same side in 60 s ($K)<input type="number" id="cfgCascReal" step="50" min="10"></label>
       <label>Cascade trigger: model levels hit in 2 min ($M)<input type="number" id="cfgCascModel" step="0.5" min="0.1"></label>
@@ -397,7 +439,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 60, cfgVer: 8, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 60, cfgVer: 8, fee: 0.04, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -871,9 +913,10 @@ function makeWS(name, urls, dot, onOpen, onMsg, pingFn, pingMs) {
 }
 function connectAll() {
   // Binance now serves market data on /market/stream; the legacy path connects but may stay silent.
-  makeWS('binance', ['wss://fstream.binance.com/market/stream?streams=ethusdt@kline_1m/ethusdt@forceOrder',
-    'wss://fstream.binance.com/stream?streams=ethusdt@kline_1m/ethusdt@forceOrder'], 'bnws', null, m => {
+  makeWS('binance', ['wss://fstream.binance.com/market/stream?streams=ethusdt@kline_1m/ethusdt@forceOrder/ethusdt@aggTrade',
+    'wss://fstream.binance.com/stream?streams=ethusdt@kline_1m/ethusdt@forceOrder/ethusdt@aggTrade'], 'bnws', null, m => {
     const d = m.data; if (!d) return;
+    if (d.e === 'aggTrade') { onAggTrade(+d.p, +d.q, d.m, d.T); return; }   // m = buyer is maker → seller was the aggressor
     if (d.e === 'kline') { S.bnLastTick = Date.now(); onTick(+d.k.c, 'Binance', +d.k.l, +d.k.h); }
     else if (d.e === 'forceOrder') {
       const o = d.o; const px = +o.ap || +o.p; const q = +o.z || +o.q;
@@ -1809,8 +1852,15 @@ function render() {
     step('market', () => { S.mc = marketCalc(); });
     step('setup', renderSetup);
     step('signal', renderSignal);
+    step('phist', samplePHist);
+    step('edge', drawEdge);
+    step('contrib', drawContrib);
     step('candle', renderCandle);
     step('first', renderFirst);
+    step('ev', evBoard);
+    step('trace', updateTrace);
+    step('flow', renderFlow);
+    step('dbar', renderDbar);
     step('inspector', renderInspector);
     step('liveread', renderLiveRead);
   }
@@ -2347,6 +2397,9 @@ function drawCandleChart(mc, ct) {
   if (v && v.tA) hline(v.tA.edge, '#22c55e', [5, 4], 'shorts box');
   if (v && v.tB) hline(v.tB.edge, '#ef4444', [5, 4], 'longs box');
   if (ct.target) { hline(ct.inval, '#94a3b8', [3, 3], 'invalid.'); hline(ct.target.px, ct.dir > 0 ? '#4ade80' : '#f87171', [], 'TARGET', 2.2); }
+  // active model signal: entry / TP / SL
+  const act = S.sigLog.filter(s => !s.res).slice(-1)[0];
+  if (act) { hline(act.entry, '#e2e8f0', [6, 3], 'ENTRY'); hline(act.tp, '#4ade80', [], 'TP', 2); hline(act.sl, '#f87171', [], 'SL', 2); }
   // candles
   ks.forEach((k, i) => {
     const x = X(i) + cw * 0.5, up = k.c >= k.o, live = i === ks.length - 1;
@@ -2356,6 +2409,15 @@ function drawCandleChart(mc, ct) {
     if (live) { ctx.lineWidth = 1.5; ctx.strokeRect(x - cw * 0.35, yb, cw * 0.7, hb); ctx.globalAlpha = 0.45; ctx.fillRect(x - cw * 0.35, yb, cw * 0.7, hb); ctx.globalAlpha = 1; }
     else ctx.fillRect(x - cw * 0.35, yb, cw * 0.7, hb);
   });
+  // markers for past model signals (▲ long below the candle, ▼ short above), coloured by outcome
+  for (const s of S.sigLog) {
+    const i = ks.findIndex(k => s.t >= k.t && s.t < k.t + T15); if (i < 0) continue;
+    const x = X(i) + cw * 0.5, k = ks[i], col = s.res === 'win' ? '#4ade80' : s.res === 'loss' ? '#f87171' : '#fbbf24';
+    ctx.fillStyle = col; ctx.beginPath();
+    if (s.dir > 0) { const y = Y(k.l) + 6; ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 8); ctx.lineTo(x + 5, y + 8); }
+    else { const y = Y(k.h) - 6; ctx.moveTo(x, y); ctx.lineTo(x - 5, y - 8); ctx.lineTo(x + 5, y - 8); }
+    ctx.closePath(); ctx.fill();
+  }
   // arrow from price to target
   if (ct.target) {
     const x = X(ks.length - 1) + cw * 0.5, x2 = X(ks.length + 1.2);
@@ -2469,13 +2531,61 @@ async function trainModel() {
     const cut = Math.floor(X.length * 0.7);
     const sc1 = fitScaler(X.slice(0, cut)), Z1 = X.map(x => zs(x, sc1));
     const wL1 = trainLR(Z1.slice(0, cut), yL.slice(0, cut)), wS1 = trainLR(Z1.slice(0, cut), yS.slice(0, cut));
-    const pL = Z1.slice(cut).map(z => predLR(wL1, z)), pS = Z1.slice(cut).map(z => predLR(wS1, z));
+    await new Promise(r => setTimeout(r, 0));
+    const gL1 = trainGBM(X.slice(0, cut), yL.slice(0, cut)), gS1 = trainGBM(X.slice(0, cut), yS.slice(0, cut));
+    // ensemble = average of logistic regression and gradient-boosted trees
+    const ens = (w, g) => X.slice(cut).map((x, ii) => (predLR(w, Z1[cut + ii]) + predGBM(g, x).p) / 2);
+    const pL = ens(wL1, gL1), pS = ens(wS1, gS1);
     const evL = evalBuckets(pL, yL.slice(cut)), evS = evalBuckets(pS, yS.slice(cut));
-    // final model on everything
+    const lrOnly = evalBuckets(Z1.slice(cut).map(z => predLR(wL1, z)), yL.slice(cut)), gbOnly = evalBuckets(X.slice(cut).map(x => predGBM(gL1, x).p), yL.slice(cut));
+    // final models on everything
+    await new Promise(r => setTimeout(r, 0));
     const sc = fitScaler(X), Z = X.map(x => zs(x, sc));
-    S.model = { sc, wL: trainLR(Z, yL), wS: trainLR(Z, yS), evL, evS, n: X.length, nTest: X.length - cut, days: (k[k.length - 1].t - k[0].t) / DAY, at: Date.now(), oi };
+    S.model = { sc, wL: trainLR(Z, yL), wS: trainLR(Z, yS), gL: trainGBM(X, yL), gS: trainGBM(X, yS), evL, evS, lrOnly, gbOnly,
+      n: X.length, nTest: X.length - cut, days: (k[k.length - 1].t - k[0].t) / DAY, at: Date.now(), oi };
   } catch (e) { $('sigInfo').textContent = 'model training failed: ' + e.message; console.warn('train', e); }
   S.training = false;
+}
+// Gradient-boosted decision stumps (depth-1 trees) on log-loss, 150 trees, learning rate 0.1.
+// Depth-1 trees make the model exactly additive: each feature's contribution to the log-odds can be shown as a bar.
+function trainGBM(X, y, M = 150, eta = 0.1, nb = 16, lam = 1, minH = 5) {
+  const n = X.length, d = X[0].length, th = [], bin = [];
+  for (let j = 0; j < d; j++) {
+    const v = X.map(x => x[j]).sort((a, b) => a - b), t = [];
+    for (let q = 1; q < nb; q++) { const x = v[Math.floor(q * n / nb)]; if (!t.length || x > t[t.length - 1]) t.push(x); }
+    th.push(t);
+    const bj = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { let b = 0; while (b < t.length && X[i][j] > t[b]) b++; bj[i] = b; }
+    bin.push(bj);
+  }
+  const p0 = clip(y.reduce((a, b) => a + b, 0) / n, 0.01, 0.99), F0 = Math.log(p0 / (1 - p0));
+  const F = new Float64Array(n).fill(F0), g = new Float64Array(n), h = new Float64Array(n), trees = [];
+  for (let m = 0; m < M; m++) {
+    let G = 0, H = 0;
+    for (let i = 0; i < n; i++) { const p = sigm(F[i]); g[i] = p - y[i]; h[i] = Math.max(1e-6, p * (1 - p)); G += g[i]; H += h[i]; }
+    let best = null;
+    for (let j = 0; j < d; j++) {
+      const nbj = th[j].length + 1, gs = new Float64Array(nbj), hs = new Float64Array(nbj), bj = bin[j];
+      for (let i = 0; i < n; i++) { gs[bj[i]] += g[i]; hs[bj[i]] += h[i]; }
+      let GL = 0, HL = 0;
+      for (let b = 0; b < nbj - 1; b++) {
+        GL += gs[b]; HL += hs[b]; const GR = G - GL, HR = H - HL;
+        if (HL < minH || HR < minH) continue;
+        const gain = GL * GL / (HL + lam) + GR * GR / (HR + lam) - G * G / (H + lam);
+        if (!best || gain > best.gain) best = { gain, j, b, L: -GL / (HL + lam) * eta, R: -GR / (HR + lam) * eta };
+      }
+    }
+    if (!best) break;
+    trees.push({ j: best.j, t: th[best.j][best.b], L: best.L, R: best.R });
+    const bj = bin[best.j];
+    for (let i = 0; i < n; i++) F[i] += bj[i] <= best.b ? best.L : best.R;
+  }
+  return { F0, trees };
+}
+function predGBM(md, x) {
+  let F = md.F0; const c = new Float64Array(x.length);
+  for (const t of md.trees) { const v = x[t.j] <= t.t ? t.L : t.R; F += v; c[t.j] += v; }
+  return { p: sigm(F), c, F };
 }
 function modelPredict(useForming) {
   const m = S.model, kl = k15Live(); if (!m || kl.length < 120) return null;
@@ -2483,9 +2593,12 @@ function modelPredict(useForming) {
   const { F, atr } = featureSeries(k, m.oi, useForming ? (S.bnOIraw || null) : null);
   const i = k.length - 1; if (!F[i]) return null;
   const z = zs(F[i], m.sc);
-  const pL = predLR(m.wL, z), pS = predLR(m.wS, z);
-  const contrib = w => z.map((v, j) => [FEAT_NAMES[j], w[j] * v, F[i][j]]).sort((a, b) => b[1] - a[1]);
-  return { pL, pS, atr: atr[i], t: k[i].t, cL: contrib(m.wL), cS: contrib(m.wS), forming: useForming };
+  const gL = predGBM(m.gL, F[i]), gS = predGBM(m.gS, F[i]);
+  const lrL = predLR(m.wL, z), lrS = predLR(m.wS, z);
+  const pL = (lrL + gL.p) / 2, pS = (lrS + gS.p) / 2;
+  // contributions: half from the logistic weights (w·z) and half from the trees (sum of leaf values), in log-odds units
+  const contrib = (w, gc) => z.map((v, j) => [FEAT_NAMES[j], (w[j] * v + gc[j]) / 2, F[i][j]]).sort((a, b) => b[1] - a[1]);
+  return { pL, pS, lrL, lrS, gbL: gL.p, gbS: gS.p, atr: atr[i], t: k[i].t, cL: contrib(m.wL, gL.c), cS: contrib(m.wS, gS.c), forming: useForming };
 }
 function evalSignals() {
   const now = Date.now(), p = S.price; if (!p) return;
@@ -2529,6 +2642,7 @@ function renderSignal() {
   const thr = cfg.sigThr / 100;
   const closed = modelPredict(false), form = modelPredict(true);
   if (!closed) return;
+  S.sigNow = { closed, form };
   const now = Date.now(), slotEnd = Math.floor(now / T15) * T15 + T15, elapsed = 1 - (slotEnd - now) / T15;
   // official = last closed candle; preview = forming candle once ≥ 2/3 of it has printed
   const cand = [{ src: 'closed', r: closed }];
@@ -2536,7 +2650,10 @@ function renderSignal() {
   let best = null;
   for (const c of cand) for (const [dir, pp] of [[1, c.r.pL], [-1, c.r.pS]]) if (pp >= thr && (!best || pp > best.p)) best = { dir, p: pp, r: c.r, src: c.src };
   const ev = d => d > 0 ? m.evL : m.evS;
-  const honest = d => { const e = ev(d)[0.8], e7 = ev(d)[0.7]; return `held-out test (${m.nTest} candles): when ${d > 0 ? 'LONG' : 'SHORT'} ≥80% → ${e.n ? Math.round(e.hit * 100) + '% right (n=' + e.n + ')' : 'never reached'} · ≥70% → ${e7.n ? Math.round(e7.hit * 100) + '% (n=' + e7.n + ')' : 'never'} · base rate ${Math.round(ev(d).base * 100)}%`; };
+  const honest = d => {
+    const f = th => { const e = ev(d)[th]; return e.n ? `${Math.round(e.hit * 100)}% right (n=${e.n})` : 'never reached'; };
+    return `held-out test (${m.nTest} candles), ${d > 0 ? 'LONG' : 'SHORT'}: ≥80% → ${f(0.8)} · ≥70% → ${f(0.7)} · ≥60% → ${f(0.6)} · ≥50% → ${f(0.5)} · base rate ${Math.round(ev(d).base * 100)}%`;
+  };
   if (best) {
     const p = S.price, a = best.r.atr, tp = p + best.dir * SIG_K * a, sl = p - best.dir * SIG_K * a;
     const reasons = (best.dir > 0 ? best.r.cL : best.r.cS).filter(([nm, c]) => !nm.startsWith('time of day') && c > 0).slice(0, 3).map(([nm, , raw]) => REASON_TXT(nm, raw, best.dir));
@@ -2562,6 +2679,221 @@ function renderSignal() {
   const ss = S.sigStats, done = ss.win + ss.loss;
   $('sigInfo').innerHTML = `model trained ${hhmmss(m.at)} on ${m.n} candles (${m.days.toFixed(0)} days) · outcome: ±${SIG_K} ATR within 30 min (target before stop) · ` +
     `${honest(1)} · ${honest(-1)} · this session: ${ss.win} wins / ${ss.loss} losses / ${ss.exp} expired${done ? ` (${Math.round(ss.win / done * 100)}%)` : ''}`;
+}
+
+/* ================= State-space smoothing: Kalman filter on the logit of p ================= */
+// x_t = x_{t-1} + w (q), z_t = x_t + v (r). Smooths the forming-candle probability so one tick does not flip it.
+const logit = p => Math.log(clip(p, 1e-4, 1 - 1e-4) / (1 - clip(p, 1e-4, 1 - 1e-4)));
+function kalmanStep(st, z, q = 0.02, r = 0.25) {
+  if (!st) return { x: z, P: 1 };
+  const P = st.P + q, K = P / (P + r);
+  return { x: st.x + K * (z - st.x), P: (1 - K) * P, K };
+}
+S.pHist = []; S.kfL = null; S.kfS = null; S.lastPH = 0;
+function samplePHist() {
+  const sn = S.sigNow; if (!sn) return;
+  const src = sn.form || sn.closed, now = Date.now();
+  if (now - S.lastPH < 10000) return;
+  S.lastPH = now;
+  S.kfL = kalmanStep(S.kfL, logit(src.pL)); S.kfS = kalmanStep(S.kfS, logit(src.pS));
+  const W = S.walls, imb = W && W.imb1.a > 0 ? Math.log(W.imb1.b / W.imb1.a) : 0;
+  S.pHist.push({ t: now, pL: src.pL, pS: src.pS, fL: sigm(S.kfL.x), fS: sigm(S.kfS.x), imb, px: S.price });
+  while (S.pHist.length && S.pHist[0].t < now - 2 * 3600e3) S.pHist.shift();
+}
+function drawEdge() {
+  const c0 = setupCanvas($('cvEdge')); if (!c0) return;
+  const { ctx, W, H } = c0, h = S.pHist;
+  const padL = 34, padR = 8, top = 10, bot = H - 18;
+  ctx.font = '10px system-ui,sans-serif'; ctx.fillStyle = '#7c879c';
+  if (h.length < 2) { ctx.fillText('collecting… one point every 10 s (needs ~1 min)', padL, 24); return; }
+  const t0 = h[0].t, t1 = h[h.length - 1].t, X = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR), Y = p => bot - p * (bot - top);
+  // grid + threshold
+  ctx.strokeStyle = '#1c2537'; ctx.lineWidth = 1;
+  for (const p of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(padL, Y(p) + .5); ctx.lineTo(W - padR, Y(p) + .5); ctx.stroke(); ctx.fillText(Math.round(p * 100) + '%', 4, Y(p) + 3); }
+  ctx.strokeStyle = '#fbbf24'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(padL, Y(cfg.sigThr / 100)); ctx.lineTo(W - padR, Y(cfg.sigThr / 100)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#fbbf24'; ctx.fillText('alert ' + cfg.sigThr + '%', W - padR - 52, Y(cfg.sigThr / 100) - 3);
+  // edge area (long − short) around 50%
+  ctx.beginPath(); ctx.moveTo(X(h[0].t), Y(0.5));
+  for (const e of h) ctx.lineTo(X(e.t), Y(0.5 + (e.fL - e.fS) / 2));
+  ctx.lineTo(X(t1), Y(0.5)); ctx.closePath();
+  const last = h[h.length - 1];
+  ctx.fillStyle = last.fL >= last.fS ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.18)'; ctx.fill();
+  // book imbalance (scaled) dotted
+  ctx.strokeStyle = '#60a5fa'; ctx.setLineDash([2, 3]); ctx.beginPath();
+  h.forEach((e, i) => { const y = Y(0.5 + clip(e.imb, -1, 1) / 4); i ? ctx.lineTo(X(e.t), y) : ctx.moveTo(X(e.t), y); }); ctx.stroke(); ctx.setLineDash([]);
+  const line = (key, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); h.forEach((e, i) => i ? ctx.lineTo(X(e.t), Y(e[key])) : ctx.moveTo(X(e.t), Y(e[key]))); ctx.stroke(); };
+  line('pL', 'rgba(74,222,128,.35)', 1); line('pS', 'rgba(248,113,113,.35)', 1);
+  line('fL', '#22c55e', 2.2); line('fS', '#ef4444', 2.2);
+  ctx.fillStyle = '#7c879c'; ctx.textAlign = 'left';
+  ctx.fillText(new Date(t0).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), padL, H - 4);
+  ctx.textAlign = 'right'; ctx.fillText('now', W - padR, H - 4); ctx.textAlign = 'left';
+}
+function drawContrib() {
+  const c0 = setupCanvas($('cvContrib')); if (!c0) return;
+  const { ctx, W, H } = c0, sn = S.sigNow; if (!sn) return;
+  const r = sn.form || sn.closed, lead = r.pL >= r.pS ? 1 : -1, list = (lead > 0 ? r.cL : r.cS).slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 10);
+  const mx = Math.max(0.05, ...list.map(x => Math.abs(x[1]))), mid = W * 0.58, rowH = (H - 16) / list.length;
+  ctx.font = '10.5px system-ui,sans-serif';
+  ctx.fillStyle = '#94a3b8'; ctx.fillText(`what pushes ${lead > 0 ? 'LONG' : 'SHORT'} (log-odds, ← against · for →)`, 4, 11);
+  list.forEach(([nm, v], i) => {
+    const y = 16 + i * rowH, w = Math.abs(v) / mx * (W - mid - 10);
+    ctx.fillStyle = '#aab4c6'; ctx.textAlign = 'right'; ctx.fillText(nm, mid - 6 - (v < 0 ? w : 0), y + rowH * 0.65);
+    ctx.fillStyle = v >= 0 ? (lead > 0 ? '#22c55e' : '#ef4444') : '#475569';
+    ctx.fillRect(v >= 0 ? mid : mid - w, y + 2, w, rowH - 5);
+  });
+  ctx.strokeStyle = '#334155'; ctx.beginPath(); ctx.moveTo(mid + .5, 14); ctx.lineTo(mid + .5, H); ctx.stroke(); ctx.textAlign = 'left';
+}
+
+/* ================= Expected value: ranked entries ================= */
+// EV per trade (% of price) = p·TP% − (1−p)·SL% − round-trip cost%. Score = EV per hour of expected holding time.
+function evBoard() {
+  const p = S.price, sn = S.sigNow, out = [];
+  const fee = cfg.fee || 0, sig = S.sigma || (S.mc && S.mc.s15 * Math.sqrt(96));
+  if (sn && sn.closed && sn.closed.atr) {
+    const r = sn.closed, d = SIG_K * r.atr / p * 100;
+    out.push({ name: 'LONG now (model, 30 min)', dir: 1, p: r.pL, tp: d, sl: d, mins: 30 });
+    out.push({ name: 'SHORT now (model, 30 min)', dir: -1, p: r.pS, tp: d, sl: d, mins: 30 });
+  }
+  const ct = S.ctNow;
+  if (ct && ct.target && ct.pTargetFirst != null) {
+    const tp = Math.abs(ct.target.px / p - 1) * 100, sl = Math.abs(ct.inval / p - 1) * 100;
+    out.push({ name: `15-min target ${ct.dir > 0 ? '▲' : '▼'} $${fmtPx(ct.target.px, 0)}`, dir: ct.dir, p: ct.pTargetFirst, tp, sl, mins: Math.max(1, ct.rem / 60000) });
+  }
+  const Wl = S.walls;
+  if (Wl && Wl.bigAsk && Wl.bigBid && sig) {
+    const h = hitFirst(p, Wl.bigAsk.lvl, Wl.bigBid.lvl, sig, 0);
+    if (h) {
+      const up = (Wl.bigAsk.lvl / p - 1) * 100, dn = (1 - Wl.bigBid.lvl / p) * 100;
+      out.push({ name: `wall to wall LONG (neutral odds)`, dir: 1, p: h.neutral, tp: up, sl: dn, mins: h.etaDays * 1440 });
+      out.push({ name: `wall to wall SHORT (neutral odds)`, dir: -1, p: 1 - h.neutral, tp: dn, sl: up, mins: h.etaDays * 1440 });
+    }
+  }
+  for (const x of out) { x.ev = x.p * x.tp - (1 - x.p) * x.sl - fee; x.score = x.ev / Math.max(1, x.mins) * 60; }
+  out.sort((a, b) => b.score - a.score);
+  S.evNow = out;
+  $('evBody').innerHTML = out.map((x, i) => `<tr class="${x.ev > 0 ? 'evp' : 'evn'}${i === 0 && x.ev > 0 ? ' top' : ''}"><td>${i + 1}</td><td class="${x.dir > 0 ? 'pos' : 'neg'}">${esc(x.name)}</td><td><b>${Math.round(x.p * 100)}%</b></td><td>+${x.tp.toFixed(2)}% / −${x.sl.toFixed(2)}%</td><td>${fmtEta(x.mins / 1440)}</td><td><b>${x.ev >= 0 ? '+' : ''}${x.ev.toFixed(3)}%</b></td><td>${x.score >= 0 ? '+' : ''}${x.score.toFixed(3)}%/h</td></tr>`).join('') ||
+    '<tr><td colspan="7" class="muted">Waiting for the model…</td></tr>';
+}
+
+/* ================= Live trade flow (Binance aggTrade) ================= */
+const SIZE_EDGES = [1e3, 1e4, 5e4, 2.5e5, 1e6], SIZE_LBL = ['<$1K', '$1–10K', '$10–50K', '$50–250K', '$250K–1M', '>$1M'];
+S.flowB = new Map(); S.bigPrints = [];
+function onAggTrade(p, q, sellAggressor, t) {
+  const usd = p * q, k = Math.floor(t / 10000) * 10000;
+  let b = S.flowB.get(k);
+  if (!b) {
+    b = { t: k, buy: 0, sell: 0, n: 0, vb: new Float64Array(6), vs: new Float64Array(6), nb: new Uint32Array(6), p0: p, p1: p };
+    S.flowB.set(k, b);
+    const cut = k - 70 * 60000; for (const key of S.flowB.keys()) if (key < cut) S.flowB.delete(key);
+  }
+  let ix = 0; while (ix < SIZE_EDGES.length && usd >= SIZE_EDGES[ix]) ix++;
+  if (sellAggressor) { b.sell += usd; b.vs[ix] += usd; } else { b.buy += usd; b.vb[ix] += usd; }
+  b.n++; b.nb[ix]++; b.p1 = p;
+  if (usd >= 250000) { S.bigPrints.push({ t, p, usd, side: sellAggressor ? 'sell' : 'buy' }); if (S.bigPrints.length > 40) S.bigPrints.shift(); }
+}
+function flowWindow(ms) {
+  const t0 = Date.now() - ms; let buy = 0, sell = 0, n = 0; const nb = new Array(6).fill(0);
+  for (const b of S.flowB.values()) if (b.t >= t0) { buy += b.buy; sell += b.sell; n += b.n; for (let i = 0; i < 6; i++) nb[i] += b.nb[i]; }
+  let acc = 0, med = 0; for (let i = 0; i < 6; i++) { acc += nb[i]; if (acc >= n / 2) { med = i; break; } }
+  return { buy, sell, delta: buy - sell, n, perMin: n / (ms / 60000), med: SIZE_LBL[med] };
+}
+function minuteFlow(mins) {
+  const now = Date.now(), m0 = Math.floor(now / 60000) * 60000 - (mins - 1) * 60000, cols = [];
+  for (let i = 0; i < mins; i++) cols.push({ t: m0 + i * 60000, vb: new Float64Array(6), vs: new Float64Array(6), buy: 0, sell: 0, p0: null, p1: null });
+  for (const b of [...S.flowB.values()].sort((a, c) => a.t - c.t)) {
+    const i = Math.floor((b.t - m0) / 60000); if (i < 0 || i >= mins) continue;
+    const c = cols[i]; for (let j = 0; j < 6; j++) { c.vb[j] += b.vb[j]; c.vs[j] += b.vs[j]; }
+    c.buy += b.buy; c.sell += b.sell; if (c.p0 == null) c.p0 = b.p0; c.p1 = b.p1;
+  }
+  return cols;
+}
+function drawFlowHeat() {
+  const c0 = setupCanvas($('cvFlow')); if (!c0) return;
+  const { ctx, W, H } = c0, cols = minuteFlow(30), padL = 62, padR = 6, top = 6, bot = H - 16, cw = (W - padL - padR) / cols.length, rh = (bot - top) / 6;
+  let mx = 1; for (const c of cols) for (let j = 0; j < 6; j++) mx = Math.max(mx, c.vb[j] + c.vs[j]);
+  cols.forEach((c, i) => {
+    for (let j = 0; j < 6; j++) {
+      const tot = c.vb[j] + c.vs[j]; if (!tot) continue;
+      const a = Math.sqrt(tot / mx), net = (c.vb[j] - c.vs[j]) / tot;
+      ctx.fillStyle = net >= 0 ? `rgba(34,197,94,${0.15 + 0.85 * a * (0.4 + 0.6 * net)})` : `rgba(239,68,68,${0.15 + 0.85 * a * (0.4 - 0.6 * net)})`;
+      ctx.fillRect(padL + i * cw + 1, bot - (j + 1) * rh + 1, cw - 2, rh - 2);
+    }
+  });
+  ctx.font = '10px system-ui,sans-serif'; ctx.fillStyle = '#8b98b2'; ctx.textAlign = 'right';
+  SIZE_LBL.forEach((l, j) => ctx.fillText(l, padL - 6, bot - j * rh - rh / 2 + 3));
+  ctx.textAlign = 'left'; ctx.fillText('−30 min', padL, H - 3); ctx.textAlign = 'right'; ctx.fillText('now', W - padR, H - 3); ctx.textAlign = 'left';
+}
+function drawPhase() {
+  const c0 = setupCanvas($('cvPhase')); if (!c0) return;
+  const { ctx, W, H } = c0, cols = minuteFlow(45).filter(c => c.p0 != null);
+  const cx = W / 2, cy = H / 2;
+  ctx.strokeStyle = '#334155'; ctx.beginPath(); ctx.moveTo(10, cy + .5); ctx.lineTo(W - 10, cy + .5); ctx.moveTo(cx + .5, 10); ctx.lineTo(cx + .5, H - 10); ctx.stroke();
+  ctx.font = '10px system-ui,sans-serif'; ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'right'; ctx.fillText('buyers + price up', W - 8, 14); ctx.fillText('buyers, price down = absorption', W - 8, H - 6);
+  ctx.textAlign = 'left'; ctx.fillText('sellers, price up = squeeze', 8, 14); ctx.fillText('sellers + price down', 8, H - 6);
+  if (cols.length < 2) { ctx.fillText('collecting live trades…', 12, cy - 6); return; }
+  const pts = cols.map(c => ({ x: c.buy - c.sell, y: (c.p1 / c.p0 - 1) * 100 }));
+  const mxX = Math.max(1, ...pts.map(p => Math.abs(p.x))), mxY = Math.max(0.01, ...pts.map(p => Math.abs(p.y)));
+  const X = v => cx + v / mxX * (W / 2 - 18), Y = v => cy - v / mxY * (H / 2 - 18);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.strokeStyle = `rgba(148,163,184,${0.1 + 0.8 * i / pts.length})`; ctx.beginPath(); ctx.moveTo(X(pts[i - 1].x), Y(pts[i - 1].y)); ctx.lineTo(X(pts[i].x), Y(pts[i].y)); ctx.stroke();
+  }
+  const l = pts[pts.length - 1];
+  ctx.fillStyle = l.x >= 0 ? '#22c55e' : '#ef4444'; ctx.beginPath(); ctx.arc(X(l.x), Y(l.y), 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e2e8f0'; ctx.fillText(`this minute: Δ ${fmtUsd(l.x)} · ${fmtPct(l.y, 3)}`, 8, cy - 6);
+}
+function renderFlow() {
+  const f1 = flowWindow(60000), f5 = flowWindow(300000), f15 = flowWindow(900000);
+  const tile = (t, v, s, cls) => `<div class="stat"><div class="t">${t}</div><div class="v ${cls || ''}">${v}</div><div class="s">${s}</div></div>`;
+  const dcls = x => x >= 0 ? 'pos' : 'neg', ds = x => (x >= 0 ? '+' : '') + fmtUsd(x);
+  $('flowStats').innerHTML =
+    tile('Live CVD · 1 min', ds(f1.delta), `buy ${fmtUsd(f1.buy)} · sell ${fmtUsd(f1.sell)}`, dcls(f1.delta)) +
+    tile('Live CVD · 5 min', ds(f5.delta), `buyers ${f5.buy + f5.sell ? Math.round(f5.buy / (f5.buy + f5.sell) * 100) : 0}% of volume`, dcls(f5.delta)) +
+    tile('Live CVD · 15 min', ds(f15.delta), `≈ this candle's aggression`, dcls(f15.delta)) +
+    tile('Trade arrival', `${f5.perMin.toFixed(0)}/min`, `typical size ${f5.med} · last 5 min`);
+  const bp = S.bigPrints.slice(-8).reverse();
+  $('bigPrints').innerHTML = bp.length ? bp.map(b => `<span class="bp ${b.side === 'buy' ? 'pos' : 'neg'}">${hhmmss(b.t)} ${b.side === 'buy' ? '▲ buy' : '▼ sell'} ${fmtUsd(b.usd)} @ ${fmtPx(b.p)}</span>`).join('') : '<span class="muted">No prints ≥ $250K since the page opened.</span>';
+  drawFlowHeat(); drawPhase();
+}
+
+/* ================= Decision trace ================= */
+S.trace = [];
+function updateTrace() {
+  const sn = S.sigNow; if (!sn || !sn.closed) return;
+  const c = sn.closed;
+  if (S.lastTraceT !== c.t) {
+    S.lastTraceT = c.t;
+    const thr = cfg.sigThr / 100, best = c.pL >= c.pS ? 1 : -1, bp = Math.max(c.pL, c.pS);
+    const ev = (S.evNow || []).find(x => x.name.startsWith(best > 0 ? 'LONG now' : 'SHORT now'));
+    S.trace.unshift({ t: c.t + T15, pL: c.pL, pS: c.pS, dec: bp >= thr ? (best > 0 ? 'LONG' : 'SHORT') : 'no edge', ev: ev ? ev.ev : null, sigT: bp >= thr ? Date.now() : null });
+    if (S.trace.length > 16) S.trace.length = 16;
+  }
+  $('traceBody').innerHTML = S.trace.map(r => {
+    const s = r.sigT ? S.sigLog.find(x => Math.abs(x.t - r.sigT) < 5000) : null;
+    const res = s ? (s.res === 'win' ? '<b class="pos">target ✔</b>' : s.res === 'loss' ? '<b class="neg">stop ✘</b>' : s.res === 'expired' ? 'expired' : 'open…') : '—';
+    return `<tr><td>${new Date(r.t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</td><td class="pos">${Math.round(r.pL * 100)}%</td><td class="neg">${Math.round(r.pS * 100)}%</td><td><b class="${r.dec === 'LONG' ? 'pos' : r.dec === 'SHORT' ? 'neg' : 'muted'}">${r.dec}</b></td><td>${r.ev == null ? '—' : (r.ev >= 0 ? '+' : '') + r.ev.toFixed(3) + '%'}</td><td>${res}</td></tr>`;
+  }).join('');
+}
+
+/* ================= Sticky decision bar ================= */
+function renderDbar() {
+  const el = $('dbar'); if (!el || !S.price) return;
+  const sn = S.sigNow, thr = cfg.sigThr / 100;
+  const fL = S.kfL ? sigm(S.kfL.x) : sn ? (sn.form || sn.closed).pL : null, fS = S.kfS ? sigm(S.kfS.x) : sn ? (sn.form || sn.closed).pS : null;
+  const active = S.sigLog.filter(s => !s.res).slice(-1)[0];
+  const sig = active ? `<span class="pill ${active.dir > 0 ? 'up' : 'down'}">${active.dir > 0 ? '▲ LONG' : '▼ SHORT'} ${Math.round(active.p * 100)}% · TP ${fmtPx(active.tp)} · SL ${fmtPx(active.sl)}</span>`
+    : `<span class="pill neutral">NO SIGNAL ≥${cfg.sigThr}%</span>`;
+  const ev = (S.evNow || [])[0];
+  const ct = S.ctNow;
+  const cas = S.casc.find(c => c.state === 'running') ? '<span class="pill warn">⚡ CASCADE RUNNING</span>' : S.casc.some(c => c.state === 'armed') ? '<span class="pill warnc">⚡ cascade armed</span>' : '';
+  const rem = Math.floor(Date.now() / T15) * T15 + T15 - Date.now();
+  const f5 = flowWindow(300000);
+  el.innerHTML = `<span class="dpx">$${fmtPx(S.price)}</span>${sig}` +
+    (fL != null ? `<span class="dk">P long <b class="pos">${Math.round(fL * 100)}%</b> · short <b class="neg">${Math.round(fS * 100)}%</b><small> (Kalman)</small></span>` : '') +
+    (ev ? `<span class="dk">best EV <b class="${ev.ev > 0 ? 'pos' : 'neg'}">${ev.ev >= 0 ? '+' : ''}${ev.ev.toFixed(3)}%</b><small> ${esc(ev.name.split(' (')[0])}</small></span>` : '') +
+    (ct && ct.target ? `<span class="dk">15m target <b class="${ct.dir > 0 ? 'pos' : 'neg'}">${ct.dir > 0 ? '▲' : '▼'} ${fmtPx(ct.target.px, 1)}</b></span>` : '') +
+    `<span class="dk">CVD 5m <b class="${f5.delta >= 0 ? 'pos' : 'neg'}">${f5.delta >= 0 ? '+' : ''}${fmtUsd(f5.delta)}</b></span>` + cas +
+    `<span class="dk">close in <b>${Math.floor(rem / 60000)}:${String(Math.floor(rem % 60000 / 1000)).padStart(2, '0')}</b></span>`;
 }
 
 /* ================= Tooltips ================= */
@@ -2638,7 +2970,7 @@ function fillCfgForm() {
   $('vibrate').checked = !!cfg.vibrate; $('wake').checked = !!cfg.wake;
   updateSoundPill();
   $('cfgBurst').value = cfg.burstMin; $('cfgSweep').value = cfg.sweepMin;
-  $('cfgSig').value = cfg.sigThr;
+  $('cfgSig').value = cfg.sigThr; $('cfgFee').value = cfg.fee;
   $('cfgArm').value = cfg.armDist; $('cfgCascReal').value = cfg.cascadeMin; $('cfgCascModel').value = cfg.cascadeModel;
   $('soundAll').checked = !!cfg.soundAll; $('focus').checked = !!cfg.focus;
   $('optRange').value = String(cfg.optRange);
@@ -2691,6 +3023,7 @@ function bindUI() {
     if (w.length === 5 && w.some(x => x > 0)) cfg.weights = w;
     cfg.burstMin = num('cfgBurst', DEFAULTS.burstMin) || DEFAULTS.burstMin; cfg.sweepMin = num('cfgSweep', DEFAULTS.sweepMin) || DEFAULTS.sweepMin;
     cfg.sigThr = clip(num('cfgSig', DEFAULTS.sigThr) || DEFAULTS.sigThr, 50, 99);
+    cfg.fee = num('cfgFee', DEFAULTS.fee);
     cfg.armDist = num('cfgArm', DEFAULTS.armDist) || DEFAULTS.armDist; cfg.cascadeMin = num('cfgCascReal', DEFAULTS.cascadeMin) || DEFAULTS.cascadeMin; cfg.cascadeModel = num('cfgCascModel', DEFAULTS.cascadeModel) || DEFAULTS.cascadeModel;
     saveCfg(); fillCfgForm(); rebuild(); S.statusKey = ''; render();
   });
