@@ -102,7 +102,7 @@ tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
 </section>
 
 <section class="card">
-  <h2>15-min chart · Bollinger, EMA 21/50, VWAP, Fibonacci, MACD, RSI</h2>
+  <h2>ETH/USDT 15-min chart · Bollinger, EMA 21/50, VWAP, Fibonacci, MACD, RSI</h2>
   <div class="cvwrap"><canvas id="cv"></canvas></div>
 </section>
 
@@ -542,7 +542,8 @@ function drawChart(D) {
   const cv = $('cv'), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
   const dpr = window.devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-  const N = W < 600 ? 40 : 64, k = S.k, I = S.I, n = k.length, s = n - N, padR = 58, cw = (W - padR) / N;
+  const N = W < 600 ? 40 : 64, k = S.k, I = S.I, n = k.length, s = n - N, padR = 74, cw = (W - padR) / N;
+  const tags = [];   // price tags drawn in the right axis: {v, bg, fg, name}
   const pH = H * 0.64, mT = pH + 8, mH = H * 0.15, rT = mT + mH + 8, rH = H - rT - 14;
   let lo = Infinity, hi = -Infinity;
   for (let i = s; i < n; i++) { lo = Math.min(lo, k[i].l, I.bbL[i]); hi = Math.max(hi, k[i].h, I.bbU[i]); }
@@ -554,7 +555,12 @@ function drawChart(D) {
   for (let i = s; i < n; i++) ctx.lineTo(X(i), Y(I.bbU[i])); for (let i = n - 1; i >= s; i--) ctx.lineTo(X(i), Y(I.bbL[i])); ctx.closePath(); ctx.fill();
   // Fibonacci levels
   ctx.font = '10px system-ui,sans-serif';
-  for (const f of F.lv) { if (f.px < lo || f.px > hi) continue; const y = Y(f.px); ctx.strokeStyle = f.r === 0.5 || f.r === 0.618 ? 'rgba(251,191,36,.55)' : 'rgba(148,163,184,.25)'; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#94a3b8'; ctx.fillText('fib ' + f.r, W - padR + 4, y + 3); }
+  for (const f of F.lv) {
+    if (f.px < lo || f.px > hi) continue;
+    const y = Y(f.px), gold = f.r === 0.5 || f.r === 0.618;
+    ctx.strokeStyle = gold ? 'rgba(251,191,36,.55)' : 'rgba(148,163,184,.25)'; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]);
+    tags.push({ v: f.px, bg: gold ? '#4a3a0b' : '#1f2937', fg: gold ? '#fde68a' : '#cbd5e1', name: 'fib ' + f.r });
+  }
   const line = (arr, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = s; i < n; i++) i === s ? ctx.moveTo(X(i), Y(arr[i])) : ctx.lineTo(X(i), Y(arr[i])); ctx.stroke(); ctx.setLineDash([]); };
   line(I.bbU, 'rgba(96,165,250,.5)', 1); line(I.bbL, 'rgba(96,165,250,.5)', 1);
   line(I.vwap, '#c084fc', 1.2, [5, 3]); line(I.e21, '#fbbf24', 1.6); line(I.e50, '#38bdf8', 1.6);
@@ -573,11 +579,34 @@ function drawChart(D) {
   }
   // active setup lines
   if (D.dir) {
-    const e = k[D.i].c, lines = [[e, '#e5e9f2', 'entry'], [e - D.dir * D.a, '#f87171', 'stop'], [e + D.dir * TP_ATR * D.a, '#4ade80', 'TP1']];
-    for (const [v, c, l] of lines) { if (v < lo || v > hi) continue; ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(D.i), Y(v)); ctx.lineTo(W - padR, Y(v)); ctx.stroke(); ctx.fillStyle = c; ctx.font = 'bold 10.5px system-ui,sans-serif'; ctx.fillText(l, W - padR + 4, Y(v) + 3); }
+    const e = k[D.i].c, lines = [[e, '#e5e9f2', '#334155', 'entry'], [e - D.dir * D.a, '#f87171', '#7f1d1d', 'stop'], [e + D.dir * TP_ATR * D.a, '#4ade80', '#14532d', 'TP1']];
+    for (const [v, c, bg, l] of lines) {
+      if (v < lo || v > hi) continue;
+      ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(D.i), Y(v)); ctx.lineTo(W - padR, Y(v)); ctx.stroke();
+      tags.push({ v, bg, fg: '#fff', name: l, bold: true });
+    }
   }
-  // price tag
-  ctx.fillStyle = '#f1f5f9'; ctx.fillRect(W - padR, Y(S.price) - 8, padR, 16); ctx.fillStyle = '#0b1020'; ctx.font = 'bold 10.5px system-ui,sans-serif'; ctx.fillText(fmt(S.price, 1), W - padR + 3, Y(S.price) + 4);
+  tags.push({ v: S.price, bg: '#f1f5f9', fg: '#0b1020', name: 'ETH', bold: true, now: true });
+  // right price axis (ETH/USDT): round-number ticks, hidden where a tag sits
+  const step = [1, 2, 5, 10, 20, 25, 50, 100].find(st => (hi - lo) / st <= 8) || 100;
+  ctx.font = '10.5px system-ui,sans-serif';
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const y = Y(v); if (y < 10 || y > pH - 4 || tags.some(t => Math.abs(Y(t.v) - y) < 11)) continue;
+    ctx.fillStyle = '#334155'; ctx.fillRect(W - padR, Math.round(y), 4, 1);
+    ctx.fillStyle = '#8b98b2'; ctx.textAlign = 'left'; ctx.fillText(fmt(v, 0), W - padR + 7, y + 3.5);
+  }
+  // price tags: value in the axis, name just left of it inside the chart; spread apart if they overlap
+  tags.sort((a, b) => Y(a.v) - Y(b.v));
+  let lastY = -99;
+  for (const t of tags) {
+    let y = Math.max(Y(t.v), lastY + 15); lastY = y;
+    ctx.fillStyle = t.bg; ctx.fillRect(W - padR + 1, y - 8, padR - 1, 16);
+    ctx.fillStyle = t.fg; ctx.font = `${t.bold ? 'bold ' : ''}10.5px system-ui,sans-serif`; ctx.textAlign = 'left';
+    ctx.fillText(fmt(t.v, 1), W - padR + 5, y + 4);
+    if (!t.now) { ctx.textAlign = 'right'; ctx.fillStyle = t.bold ? t.bg === '#334155' ? '#e5e9f2' : t.bg === '#7f1d1d' ? '#f87171' : '#4ade80' : '#94a3b8'; ctx.fillText(t.name, W - padR - 4, y + 4); }
+  }
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 11px system-ui,sans-serif'; ctx.fillStyle = '#e5e9f2'; ctx.textAlign = 'right'; ctx.fillText('ETH/USDT · 15m', W - padR - 4, 14); ctx.textAlign = 'left';
   ctx.font = '10px system-ui,sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText('EMA21', 6, 14); ctx.fillStyle = '#fbbf24'; ctx.fillRect(40, 9, 12, 2); ctx.fillStyle = '#94a3b8'; ctx.fillText('EMA50', 58, 14); ctx.fillStyle = '#38bdf8'; ctx.fillRect(92, 9, 12, 2); ctx.fillStyle = '#94a3b8'; ctx.fillText('VWAP', 110, 14); ctx.fillStyle = '#c084fc'; ctx.fillRect(138, 9, 12, 2);
   // MACD pane
   let mx = 1e-9; for (let i = s; i < n; i++) mx = Math.max(mx, Math.abs(I.hist[i]), Math.abs(I.macd[i]), Math.abs(I.sig[i]));

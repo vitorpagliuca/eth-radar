@@ -2393,8 +2393,11 @@ function drawCandleChart(mc, ct) {
     const y = Math.round(Y(px)) + 0.5;
     ctx.strokeStyle = color; ctx.lineWidth = w || 1; ctx.setLineDash(dash || []);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = color; ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText(label, W - padR + 4, y + 3.5);
+    // ETH/USDT price in the right column, level name just left of it on the line
+    ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = color;
+    ctx.fillText(label, W - padR - 3, y - 3);
+    ctx.fillStyle = 'rgba(15,23,42,.9)'; ctx.fillRect(W - padR + 1, y - 7, padR - 1, 14);
+    ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.fillText(fmtPx(px, 1), W - padR + 4, y + 3.5);
   };
   if (mc.vwap) hline(mc.vwap, '#c084fc', [2, 3], 'VWAP');
   const Wl = S.walls;
