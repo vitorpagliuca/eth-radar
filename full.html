@@ -95,6 +95,10 @@ table.walls{margin-top:6px}table.walls td{padding:2px 6px;font-size:12px}table.w
 .sndtest{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
 .sndtest button{padding:3px 7px;font-size:11.5px}
 .ver{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#1e293b;color:#93c5fd;font-size:11px}
+body.only-maps{padding:0 2px 4px;max-width:none}
+body.only-maps>*:not(.keep):not(script){display:none!important}
+body.only-maps .keep{margin-top:0}
+body.only-maps .liveread .evlog{max-height:160px}
 .dbar{position:sticky;top:0;z-index:35;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:8px 12px;margin:0 -4px 10px;border-radius:10px;background:rgba(10,14,22,.94);border:1px solid #2b3a57;backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,.45);font-size:13px}
 .dbar .dpx{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .dbar .dk{color:#cbd5e1;font-variant-numeric:tabular-nums}.dbar .dk small{color:#64748b}.dbar .dk b{font-size:14px}
@@ -341,7 +345,7 @@ button:hover{background:#273449}
   <div class="stats" id="stats"><div class="muted">Loading…</div></div>
 </section>
 
-<section class="hists">
+<section class="hists keep">
   <div class="card">
     <div class="hhead"><h2>Liquidation map · 1 day</h2><span class="d">±6% · positions opened in the last 24 h · touch probability over 1 day</span>
       <div class="ctl"><span class="seg" data-mode><button data-v="total">All leverage</button><button data-v="lev">By leverage</button></span><label class="chk"><input type="checkbox" data-cum> cumulative</label></div></div>
@@ -363,7 +367,7 @@ button:hover{background:#273449}
   <div id="inspector"><span class="muted">Waiting for data…</span></div>
 </section>
 
-<section class="card">
+<section class="card keep">
   <div class="hhead"><h2>Liquidation heatmap · last 3 days</h2><span class="d">estimated liquidation levels still open at each 15-min mark (all leverage); white line = price</span></div>
   <div class="legend"><span><span class="heatleg"></span>less → more estimated liquidity</span><span id="heatInfo" class="muted"></span></div>
   <div class="cvwrap tall"><canvas id="cvHeat"></canvas></div>
@@ -439,7 +443,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 60, cfgVer: 8, fee: 0.04, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 60, cfgVer: 9, fee: 0, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -459,7 +463,10 @@ function loadCfg() {
     if (s) {
       const c = Object.assign(defaults(), JSON.parse(s));
       if (!Array.isArray(c.weights) || c.weights.length !== 5) c.weights = DEFAULTS.weights.slice();
-      if ((JSON.parse(s).cfgVer || 0) < 8) { c.sigThr = 60; c.cfgVer = 8; }   // v8: signal threshold moved to 60% for everyone once
+      const sv = JSON.parse(s).cfgVer || 0;
+      if (sv < 8) { c.sigThr = 60; }   // v8: signal threshold moved to 60% for everyone once
+      if (sv < 9) { c.fee = 0; }       // v9: no trading cost (Quantfury: no commission)
+      c.cfgVer = 9;
       return c;
     }
   } catch (e) { /* storage unavailable */ }
@@ -3097,9 +3104,23 @@ function startDemo() {
 
 /* ================= Start ================= */
 async function init() {
+  // ?only=maps → just the two liquidation maps + 3-day heatmap, silent (embedded in the 15-min decision page)
+  let only = null;
+  try { only = new URLSearchParams(location.search).get('only'); } catch (e) { }
+  if (only === 'maps') {
+    document.body.classList.add('only-maps');
+    cfg.sound = false; cfg.notify = false; cfg.vibrate = false;   // in memory only, never saved
+    fireAlert = () => false;
+    setInterval(() => {
+      try {
+        let h = 0; document.querySelectorAll('.keep').forEach(el => { h = Math.max(h, el.getBoundingClientRect().bottom + window.scrollY); });
+        parent.postMessage({ src: 'ethmaps', h: Math.ceil(h + 8) }, '*');
+      } catch (e) { }
+    }, 1000);
+  }
   bindUI();
-  prerenderSounds();
-  if (cfg.wake) requestWake();
+  if (!only) prerenderSounds();
+  if (cfg.wake && !only) requestWake();
   setInterval(updateSoundPill, 2000);
   let demo = false;
   try { demo = new URLSearchParams(location.search).has('demo'); } catch (e) { }
@@ -3107,11 +3128,13 @@ async function init() {
   connectAll();
   pollOI(); setInterval(pollOI, 15000);
   loadRsi(); setInterval(loadRsi, 60000);
-  loadStats(); setInterval(loadStats, 60000);
-  loadOptions(); setInterval(loadOptions, 120000);
-  setTimeout(scanCoins, 4000); setInterval(scanCoins, 300000);
-  loadBooks(); setInterval(loadBooks, 15000);
-  setTimeout(trainModel, 6000); setInterval(trainModel, 3600e3);
+  if (!only) {
+    loadStats(); setInterval(loadStats, 60000);
+    loadOptions(); setInterval(loadOptions, 120000);
+    setTimeout(scanCoins, 4000); setInterval(scanCoins, 300000);
+    loadBooks(); setInterval(loadBooks, 15000);
+    setTimeout(trainModel, 6000); setInterval(trainModel, 3600e3);
+  }
   setInterval(render, 1000);
   await loadHistory();
   setInterval(loadHistory, 30 * 60000);

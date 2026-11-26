@@ -64,6 +64,8 @@ input[type=number]{width:70px;background:var(--panel2);border:1px solid var(--li
 .banner{background:#3b1d1d;border:1px solid #7f1d1d;color:#fecaca;padding:8px 12px;border-radius:8px;margin-top:10px}
 .disc{font-size:11.5px;color:var(--muted);margin-top:14px}
 .tw{overflow-x:auto}
+.maps{padding:10px 6px}.maps h2{padding:0 8px}
+#mapsFrame{width:100%;height:1500px;border:0;display:block;background:var(--bg);border-radius:8px}
 .tsig{font-size:13px;font-weight:800;padding:3px 10px;border-radius:999px;background:#1f2937;color:#94a3b8;font-variant-numeric:tabular-nums}
 .tsig.long{background:#16a34a;color:#fff;box-shadow:0 0 12px rgba(34,197,94,.6)}.tsig.short{background:#dc2626;color:#fff;box-shadow:0 0 12px rgba(239,68,68,.6)}
 .pbar{display:grid;grid-template-columns:70px 1fr 46px;gap:8px;align-items:center;font-size:13px;margin-top:6px;font-variant-numeric:tabular-nums}
@@ -94,6 +96,11 @@ tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
   <div class="check" id="check"></div>
 </section>
 
+<section class="card maps">
+  <h2>Liquidation maps · 1 day / 1 week · 3-day heatmap <a href="full.html" style="float:right;color:#93c5fd;text-decoration:none;text-transform:none;letter-spacing:0">open full radar →</a></h2>
+  <iframe id="mapsFrame" src="full.html?only=maps" title="Liquidation maps" loading="eager" scrolling="no"></iframe>
+</section>
+
 <section class="card">
   <h2>15-min chart · Bollinger, EMA 21/50, VWAP, Fibonacci, MACD, RSI</h2>
   <div class="cvwrap"><canvas id="cv"></canvas></div>
@@ -108,7 +115,7 @@ tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
   <h2>How much to trust · threshold picked from 30 days of history</h2>
   <div id="pmInfo" class="note" style="margin-top:0"></div>
   <div class="tw"><table class="bt"><thead><tr><th>Show signal at ≥</th><th>Signals / day</th><th>Win</th><th>Avg R</th><th>Total R</th></tr></thead><tbody id="thTable"></tbody></table></div>
-  <div class="note">Rows = the most recent ~6 days the model never trained on. Win = target (1.5 ATR) hit before stop (1 ATR) within 1 h; break-even win rate ≈ 40% plus costs.</div>
+  <div class="note">Rows = the most recent ~6 days the model never trained on. Win = target (1.5 ATR) hit before stop (1 ATR) within 1 h; break-even win rate = 40% with no trading cost.</div>
 </section>
 
 <section class="card">
@@ -126,7 +133,7 @@ tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
   </div>
 </section>
 
-<div class="disc">Analysis tool: it places no orders and is not investment advice. Each trade in the test: entry at the 15-min close, stop 1 ATR, target 1.5 ATR, closed after 4 candles (1 h) if neither is hit, cost deducted. Past results do not guarantee future results.</div>
+<div class="disc">Analysis tool: it places no orders and is not investment advice. Each trade in the test: entry at the 15-min close, stop 1 ATR, target 1.5 ATR, closed after 4 candles (1 h) if neither is hit, cost from Settings deducted (default 0). Past results do not guarantee future results.</div>
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -134,7 +141,12 @@ tr.pick td{background:#1e293b;font-weight:800;color:#fde68a}
 const BN = 'https://fapi.binance.com', T15 = 900000, DAY = 864e5;
 const $ = id => document.getElementById(id);
 const CFG_KEY = 'eth15m.v1';
-const cfg = (() => { const d = { snd: true, fee: 0.04, minPD: 3 }; try { return Object.assign(d, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { return d; } })();
+const cfg = (() => {
+  const d = { snd: true, fee: 0, minPD: 3, v: 2 };
+  try { const s = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); const c = Object.assign(d, s); if ((s.v || 0) < 2) { c.fee = 0; c.v = 2; } return c; } catch (e) { return d; }   // v2: no trading cost by default
+})();
+// the embedded liquidation maps tell us their height so the frame never needs its own scrollbar
+window.addEventListener('message', e => { if (e.data && e.data.src === 'ethmaps' && e.data.h > 200) { const f = $('mapsFrame'); if (f && Math.abs(f.offsetHeight - e.data.h) > 4) f.style.height = e.data.h + 'px'; } });
 const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { } };
 const S = { k: [], oi: [], price: null, I: null, bt: null, book: null, hl: null, lastSetupT: 0, sigLog: [] };
 const fmt = (p, d = 2) => p == null || !isFinite(p) ? '—' : p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -614,7 +626,7 @@ function onNewCandle() { S.I = indicators(S.k); backtest(); renderBT(); trainPro
 async function init() {
   $('snd').checked = cfg.snd; $('fee').value = cfg.fee; $('minPD').value = cfg.minPD;
   $('snd').onchange = e => { cfg.snd = e.target.checked; saveCfg(); };
-  $('fee').onchange = e => { const v = parseFloat(e.target.value); cfg.fee = isFinite(v) && v >= 0 ? v : 0.04; saveCfg(); onNewCandle(); };
+  $('fee').onchange = e => { const v = parseFloat(e.target.value); cfg.fee = isFinite(v) && v >= 0 ? v : 0; saveCfg(); onNewCandle(); };
   $('minPD').onchange = e => { const v = parseFloat(e.target.value); cfg.minPD = isFinite(v) && v > 0 ? v : 3; saveCfg(); onNewCandle(); render(); };
   $('test').onclick = () => { cfg.snd = true; $('snd').checked = true; saveCfg(); toast(1, '▲ TEST', 'This is how a setup alert looks and sounds.'); beep(true); };
   try { await Promise.all([loadKlines(), loadOI()]); }
