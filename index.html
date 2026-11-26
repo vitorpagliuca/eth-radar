@@ -79,6 +79,19 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-botto
 table.rank td{vertical-align:middle}table.rank .rk{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#334155;font-size:11px;font-weight:700}
 table.rank tr.rk-dn td:first-child{border-left:3px solid #ef4444}table.rank tr.rk-up td:first-child{border-left:3px solid #22c55e}
 @media (max-width:760px){.setup-cols{grid-template-columns:1fr}}
+.candle-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+.candle-grid .cvwrap{height:300px}
+table.lvl td,table.lvl th{padding:3px 6px}table.lvl tr.tgt td{background:#1e293b;font-weight:700}
+table.walls{margin-top:6px}table.walls td{padding:2px 6px;font-size:12px}table.walls tr.now td{color:#8b98b2;text-align:center;font-size:11px}
+.first-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.fb-row{background:var(--panel2);border-radius:8px;padding:9px 11px}
+.fb-t{font-size:12px;color:#cbd5e1;font-weight:600;margin-bottom:5px}
+.fb-lbl{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-variant-numeric:tabular-nums;margin-bottom:4px;flex-wrap:wrap}
+.fb-bar{display:flex;height:22px;border-radius:6px;overflow:hidden;font-size:12px;font-weight:800}
+.fb-bar .u{background:linear-gradient(90deg,#15803d,#22c55e);color:#fff;display:flex;align-items:center;padding-left:8px;min-width:0;overflow:hidden}
+.fb-bar .d{background:linear-gradient(90deg,#ef4444,#b91c1c);color:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:0;overflow:hidden}
+.fb-s{font-size:11.5px;color:#8b98b2;margin-top:5px}
+@media (max-width:900px){.candle-grid{grid-template-columns:1fr}.first-board{grid-template-columns:1fr}}
 .liveread{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:10px}
 .liveread h3{font-size:12.5px;margin:0 0 6px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.6px}
 .liveread ul{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
@@ -232,12 +245,29 @@ button:hover{background:#273449}
   <div id="setupBody"></div>
 </section>
 
+<section class="card">
+  <div class="hhead"><h2>15-min candle target</h2><span class="d" id="candleInfo">target for the candle that is forming now · chances = touch before this candle closes</span></div>
+  <div id="candleHead" class="setup-sig neutral">Waiting for data…</div>
+  <div class="candle-grid">
+    <div class="cvwrap"><canvas id="cvCandle"></canvas></div>
+    <div><table class="feed lvl"><thead><tr><th>Level within reach</th><th>Price</th><th>Dist.</th><th>Touch before close</th></tr></thead><tbody id="candleLevels"></tbody></table>
+      <div id="candleStats" class="muted" style="font-size:11.5px;margin-top:6px"></div></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="hhead"><h2>Which comes first? · up level vs down level</h2><span class="d">chance price touches the upper level before the lower one · neutral = pure volatility · trend = if the last 24 h drift continued</span></div>
+  <div id="firstBoard" class="first-board"><span class="muted">Waiting for data…</span></div>
+</section>
+
 <section class="row top">
   <div class="card"><h2>RSI 14 (Wilder)</h2><div class="rsigrid" id="rsigrid"></div></div>
   <div class="card note"><h2>Automatic reading</h2><ul id="notes"><li>Waiting for data…</li></ul></div>
-  <div class="card book"><h2>Hyperliquid book (largest level)</h2>
-    <div class="blk ask"><div class="t">Sell wall (largest ask)</div><div class="p" id="venda">—</div><div class="t" id="vendaUsd"></div><div class="t rsiif" id="vendaRsi"></div></div>
-    <div class="blk bid"><div class="t">Support (largest bid)</div><div class="p" id="apoio">—</div><div class="t" id="apoioUsd"></div><div class="t rsiif" id="apoioRsi"></div></div>
+  <div class="card book"><h2>Order-book walls · Binance + Bybit + Hyperliquid</h2>
+    <div class="blk ask"><div class="t">Sell wall (largest ask, ±4%)</div><div class="p" id="venda">—</div><div class="t" id="vendaUsd"></div><div class="t rsiif" id="vendaRsi"></div></div>
+    <div class="blk bid"><div class="t">Buy wall / support (largest bid, ±4%)</div><div class="p" id="apoio">—</div><div class="t" id="apoioUsd"></div><div class="t rsiif" id="apoioRsi"></div></div>
+    <table class="feed walls"><tbody id="wallList"></tbody></table>
+    <div class="muted" style="font-size:10.5px;margin-top:4px">$5 bins, walls start 0.2% away from price. Depth: Binance ≈ ±0.7%, Bybit ≈ ±0.5%, Hyperliquid ≈ ±5% ($10 levels). Walls can be pulled at any time.</div>
   </div>
 </section>
 
@@ -683,11 +713,13 @@ async function loadRsi() {
     try {
       const k = await getJSON(`${BN}/fapi/v1/klines?symbol=ETHUSDT&interval=${tf.bn}&limit=200`);
       S.rsi[tf.k] = k.map(x => +x[4]);
+      if (tf.k === '15m') S.k15 = k.map(x => ({ t: x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5], tb: +x[9] }));   // tb = taker buy volume
     } catch (e) {
       try {
         const j = await getJSON(`${BY}/v5/market/kline?category=linear&symbol=ETHUSDT&interval=${tf.by}&limit=200`);
         if (j.retCode !== 0) throw new Error(j.retMsg);
         S.rsi[tf.k] = j.result.list.map(x => +x[4]).reverse();
+        if (tf.k === '15m') S.k15 = j.result.list.map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5], tb: null })).reverse();
         setDot('byrest', 'ok', 'RSI via Bybit');
       } catch (e2) { setDot('byrest', 'err', 'RSI: ' + e2.message); }
     }
@@ -844,6 +876,7 @@ function connectAll() {
         const [bids, asks] = m.data.levels;
         const big = arr => { let best = null; for (const x of arr || []) { const px = +x.px, usd = px * (+x.sz); if (!best || usd > best.usd) best = { px, usd }; } return best; };
         S.book = { bid: big(bids), ask: big(asks), t: Date.now() };
+        S.hlLevels = { bids: (bids || []).map(x => [+x.px, +x.px * +x.sz]), asks: (asks || []).map(x => [+x.px, +x.px * +x.sz]), t: Date.now() };
       }
     }, ws => ws.send(JSON.stringify({ method: 'ping' })), 30000);
 }
@@ -1258,6 +1291,18 @@ function renderStats() {
   if (st.lsAcc) tile('Long/short accounts · Binance', `${(+st.lsAcc.longAccount * 100).toFixed(1)}% / ${(+st.lsAcc.shortAccount * 100).toFixed(1)}%`, 'ratio ' + (+st.lsAcc.longShortRatio).toFixed(2));
   if (st.lsTop) tile('Top traders (positions)', `${(+st.lsTop.longAccount * 100).toFixed(1)}% / ${(+st.lsTop.shortAccount * 100).toFixed(1)}%`, 'ratio ' + (+st.lsTop.longShortRatio).toFixed(2));
   if (st.taker) tile('Taker buy/sell · 15m', (+st.taker.buySellRatio).toFixed(2), `buy ${fmtEth(+st.taker.buyVol)} · sell ${fmtEth(+st.taker.sellVol)}`, +st.taker.buySellRatio >= 1 ? 'pos' : 'neg');
+  const mc = S.mc;
+  if (mc) {
+    if (mc.cvd.h4 != null) {
+      const div = mc.ch4h != null && ((mc.ch4h > 0.3 && mc.cvd.h4 < 0) ? ' · bearish divergence (price up, sellers dominate)' : (mc.ch4h < -0.3 && mc.cvd.h4 > 0) ? ' · bullish divergence (price down, buyers dominate)' : '');
+      tile('CVD · taker delta (Binance)', (mc.cvd.h4 > 0 ? '+' : '') + fmtEth(mc.cvd.h4) + ' / 4h', `1h ${(mc.cvd.h1 > 0 ? '+' : '') + fmtEth(mc.cvd.h1)} · 24h ${(mc.cvd.h24 > 0 ? '+' : '') + fmtEth(mc.cvd.h24)}${div || ''}`, mc.cvd.h4 >= 0 ? 'pos' : 'neg');
+    }
+    if (mc.vwap) tile('VWAP 24 h', '$' + fmtPx(mc.vwap), `price ${fmtPct((S.price / mc.vwap - 1) * 100)} ${S.price >= mc.vwap ? 'above' : 'below'}`, S.price >= mc.vwap ? 'pos' : 'neg');
+    if (mc.oi4 != null) tile('Open interest change', fmtPct(mc.oi4) + ' / 4h', `1h ${fmtPct(mc.oi1)} · 24h ${fmtPct(mc.oi24)}` + (mc.ch4h != null ? ` · price 4h ${fmtPct(mc.ch4h)}${mc.oi4 > 0.5 && mc.ch4h < -0.3 ? ' → new shorts piling in' : mc.oi4 > 0.5 && mc.ch4h > 0.3 ? ' → new longs piling in' : mc.oi4 < -0.5 ? ' → positions closing' : ''}` : ''), mc.oi4 >= 0 ? 'pos' : 'neg');
+    if (mc.atr) tile('ATR 14 · 15-min', '$' + fmtPx(mc.atr), `${fmtPct(mc.atr / S.price * 100)} per candle · 15m σ ${(mc.s15 * 100).toFixed(2)}%`);
+  }
+  const Wb = S.walls;
+  if (Wb && Wb.imb1.b + Wb.imb1.a > 0) { const q = Wb.imb1.b / Math.max(1, Wb.imb1.a); tile('Order book ±1% · bids/asks', q.toFixed(2), `bids ${fmtUsd(Wb.imb1.b)} · asks ${fmtUsd(Wb.imb1.a)} · 3 exchanges`, q >= 1 ? 'pos' : 'neg'); }
   const cx = S.scan && S.scan.ctx;
   if (cx) tile('Market now · BTC 24 h', fmtPct(cx.btc24), 'BTC $' + fmtPx(cx.btcPx, 0), cx.btc24 >= 0 ? 'pos' : 'neg');
   if (cx && isFinite(cx.corr)) tile('ETH moves with BTC', cx.corr.toFixed(2), 'correlation of 15-min returns, last 2 days' + (cx.corr > 0.8 ? ' · moving together' : cx.corr < 0.5 ? ' · decoupled' : ''));
@@ -1594,6 +1639,8 @@ function renderLiveRead() {
     if (c.state === 'running') out.push(`<b class="${cl}">⚡ CASCADE ${side ? 'UP' : 'DOWN'} RUNNING</b> since ${hhmmss(c.since)}: started at $${fmtPx(c.startPx, 0)}, now ${fmtPct(c.moved)}; ladder runs to $${fmtPx(L.to, 0)} (${fmtUsd(L.usd)} of estimated ${side ? 'shorts' : 'longs'}).`);
     else out.push(`⚡ Possible cascade ${w}${c.state === 'armed' ? ' <b class="warnc">ARMED</b>' : ''}: if $${fmtPx(L.from, 0)} breaks → up to $${fmtPx(L.to, 0)} (${fmtUsd(L.usd)} over ${L.span.toFixed(1)}% of price). Ladder start ${fmtPct(L.distStart)} away, 1-day touch chance ${fmtProb(L.probStart)}. <span class="muted">Triggers (with sound) only if real ${side ? 'short' : 'long'} liquidations ≥ ${fmtUsd(cfg.cascadeMin * 1e3)}/60 s hit while armed.</span>`);
   }
+  if (S.ctNow && S.ctNow.target) out.push(`15-min candle target: <b class="${S.ctNow.dir > 0 ? 'pos' : 'neg'}">${S.ctNow.dir > 0 ? '▲' : '▼'} $${fmtPx(S.ctNow.target.px)}</b> (${esc(S.ctNow.target.name)}), touch before close ${fmtProb(S.ctNow.target.prob)}.`);
+  if (S.firstTop) out.push(`${esc(S.firstTop.title)}: up first <b class="pos">${Math.round(S.firstTop.u * 100)}%</b> ($${fmtPx(S.firstTop.up, 0)}) vs down first <b class="neg">${Math.round((1 - S.firstTop.u) * 100)}%</b> ($${fmtPx(S.firstTop.dn, 0)}).`);
   if (S.setup) out.push(`15-min setup: <b class="${S.setup.cls === 'up' ? 'pos' : S.setup.cls === 'down' ? 'neg' : ''}">${esc(S.setup.signal)}</b> (long ${S.setup.sL}/7 · short ${S.setup.sS}/7).`);
   // 2) sweep in progress
   for (const side of [0, 1]) {
@@ -1665,13 +1712,19 @@ function renderFeed() {
     `<tr><td>${hhmmss(e.te)}</td><td>${esc(e.ex)}</td><td class="${e.side === 0 ? 'neg' : 'pos'}">${e.side === 0 ? 'long' : 'short'}</td><td>${fmtPx(e.price)}</td><td>${fmtUsd(e.usd)}</td></tr>`).join('');
 }
 function renderBook() {
-  const b = S.book;
-  $('apoio').textContent = b.bid ? '$' + fmtPx(b.bid.px, 0) : '—';
-  $('apoioUsd').textContent = b.bid ? fmtUsd(b.bid.usd) + (S.price ? ' · ' + fmtPct((b.bid.px / S.price - 1) * 100) : '') : '';
-  $('venda').textContent = b.ask ? '$' + fmtPx(b.ask.px, 0) : '—';
-  $('vendaUsd').textContent = b.ask ? fmtUsd(b.ask.usd) + (S.price ? ' · ' + fmtPct((b.ask.px / S.price - 1) * 100) : '') : '';
-  $('apoioRsi').innerHTML = b.bid ? `RSI if price goes to ${fmtPx(b.bid.px, 0)}: ${rsiAtLine(b.bid.px)}` : '';
-  $('vendaRsi').innerHTML = b.ask ? `RSI if price goes to ${fmtPx(b.ask.px, 0)}: ${rsiAtLine(b.ask.px)}` : '';
+  const W = S.walls, p = S.price;
+  if (!W || !p) return;
+  const ba = W.bigAsk, bb = W.bigBid;
+  $('venda').textContent = ba ? `$${fmtPx(ba.lo, 0)}–${fmtPx(ba.hi, 0)}` : '—';
+  $('vendaUsd').textContent = ba ? `${fmtUsd(ba.usd)} · ${fmtPct((ba.lvl / p - 1) * 100)} · ${srcTxt(ba.src)}` : '';
+  $('apoio').textContent = bb ? `$${fmtPx(bb.lo, 0)}–${fmtPx(bb.hi, 0)}` : '—';
+  $('apoioUsd').textContent = bb ? `${fmtUsd(bb.usd)} · ${fmtPct((bb.lvl / p - 1) * 100)} · ${srcTxt(bb.src)}` : '';
+  $('vendaRsi').innerHTML = ba ? `RSI if price goes to ${fmtPx(ba.lvl, 0)}: ${rsiAtLine(ba.lvl)}` : '';
+  $('apoioRsi').innerHTML = bb ? `RSI if price goes to ${fmtPx(bb.lvl, 0)}: ${rsiAtLine(bb.lvl)}` : '';
+  const row = (x, side) => `<tr><td class="${side ? 'neg' : 'pos'}">${side ? 'ask' : 'bid'}</td><td>$${fmtPx(x.lo, 0)}–${fmtPx(x.hi, 0)}</td><td>${fmtPct((x.lvl / p - 1) * 100)}</td><td><b>${fmtUsd(x.usd)}</b></td></tr>`;
+  $('wallList').innerHTML = W.asks.slice(0, 3).sort((a, b) => b.lo - a.lo).map(x => row(x, 1)).join('') +
+    `<tr class="now"><td colspan="4">— price $${fmtPx(p)} · book ±1%: bids ${fmtUsd(W.imb1.b)} / asks ${fmtUsd(W.imb1.a)} —</td></tr>` +
+    W.bids.slice(0, 3).sort((a, b) => b.lo - a.lo).map(x => row(x, 0)).join('');
 }
 function render() {
   const step = (name, fn) => { try { fn(); } catch (e) { console.error('render ' + name, e); } };
@@ -1692,7 +1745,11 @@ function render() {
     step('status', () => renderStatus(S.views.D));
     step('heat', drawHeat);
     step('bursts', checkBursts);
+    step('walls', () => { S.walls = computeWalls(); });
+    step('market', () => { S.mc = marketCalc(); });
     step('setup', renderSetup);
+    step('candle', renderCandle);
+    step('first', renderFirst);
     step('inspector', renderInspector);
     step('liveread', renderLiveRead);
   }
@@ -1994,6 +2051,255 @@ function renderScan() {
     `<td><b>${fmtProb(r.p1)}</b></td><td>${fmtProb(r.p7)}</td></tr>`).join('');
 }
 
+/* ================= Order-book walls (Binance + Bybit + Hyperliquid, $5 bins) ================= */
+const WALL_BIN = 5;
+async function loadBooks() {
+  if (S.demo) return;
+  await Promise.allSettled([
+    getJSON(`${BN}/fapi/v1/depth?symbol=ETHUSDT&limit=1000`, 8000).then(j => { S.bnBook = { bids: j.bids.map(([p, q]) => [+p, +p * +q]), asks: j.asks.map(([p, q]) => [+p, +p * +q]), t: Date.now() }; }),
+    getJSON(`${BY}/v5/market/orderbook?category=linear&symbol=ETHUSDT&limit=500`, 8000).then(j => { if (j.retCode !== 0) throw new Error(j.retMsg); S.byBook = { bids: j.result.b.map(([p, q]) => [+p, +p * +q]), asks: j.result.a.map(([p, q]) => [+p, +p * +q]), t: Date.now() }; })
+  ]);
+}
+function computeWalls() {
+  const p = S.price; if (!p) return null;
+  const bins = new Map();
+  const add = (src, side, arr) => {
+    if (!arr) return;
+    for (const [px, usd] of arr) {
+      if (!(usd > 0) || Math.abs(px / p - 1) > 0.04) continue;
+      if ((side === 'b' && px >= p) || (side === 'a' && px <= p)) continue;
+      const k = Math.floor(px / WALL_BIN);
+      let x = bins.get(k); if (!x) { x = { k, b: 0, a: 0, src: {} }; bins.set(k, x); }
+      x[side] += usd; x.src[src] = (x.src[src] || 0) + usd;
+    }
+  };
+  const fresh = o => o && Date.now() - o.t < 60000;
+  for (const [name, bk] of [['Binance', S.bnBook], ['Bybit', S.byBook], ['Hyperliquid', S.hlLevels]]) if (fresh(bk)) { add(name, 'b', bk.bids); add(name, 'a', bk.asks); }
+  const all = [...bins.values()];
+  if (!all.length) return null;
+  const mk = (x, side) => ({ lo: x.k * WALL_BIN, hi: (x.k + 1) * WALL_BIN, usd: x[side], src: x.src, lvl: side === 'b' ? (x.k + 1) * WALL_BIN : x.k * WALL_BIN });
+  // walls ignore the first 0.2% around price (market-maker quotes at the spread are always the "biggest")
+  const far = x => Math.abs(x.lvl / p - 1) >= 0.002;
+  const bids = all.filter(x => x.b > 0).map(x => mk(x, 'b')).filter(far).sort((a, b) => b.usd - a.usd);
+  const asks = all.filter(x => x.a > 0).map(x => mk(x, 'a')).filter(far).sort((a, b) => b.usd - a.usd);
+  const med = arr => { const v = arr.map(x => x.usd).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 0; };
+  const strong = (arr, dir) => { const m = med(arr) * 3; return arr.filter(x => x.usd >= m).sort((a, b) => dir < 0 ? b.lvl - a.lvl : a.lvl - b.lvl)[0] || null; };
+  let b1 = 0, a1 = 0;
+  for (const x of all) if (Math.abs((x.k + 0.5) * WALL_BIN / p - 1) <= 0.01) { b1 += x.b; a1 += x.a; }
+  return { bids, asks, bigBid: bids[0] || null, bigAsk: asks[0] || null, nearBid: strong(bids, -1), nearAsk: strong(asks, 1), imb1: { b: b1, a: a1 } };
+}
+function srcTxt(src) {
+  const tot = Object.values(src).reduce((a, b) => a + b, 0) || 1;
+  return Object.entries(src).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v / tot * 100)}%`).join(' · ');
+}
+
+/* ================= Market calc: live 15-min candles, CVD, VWAP, ATR, OI change ================= */
+function k15Live() {
+  const k = (S.k15 || []).map(x => Object.assign({}, x));
+  if (!k.length || !S.price) return k;
+  const slot = Math.floor(Date.now() / T15) * T15;
+  const mins = S.liveMinutes.filter(m => m.t >= slot);
+  if (S.curMin && S.curMin.t >= slot) mins.push(S.curMin);
+  let last = k[k.length - 1];
+  if (last.t < slot) { const o = mins.length ? mins[0].o : last.c; last = { t: slot, o, h: o, l: o, c: o, v: 0, tb: last.tb == null ? null : 0, synthetic: true }; k.push(last); }
+  for (const m of mins) { last.h = Math.max(last.h, m.h); last.l = Math.min(last.l, m.l); }
+  last.h = Math.max(last.h, S.price); last.l = Math.min(last.l, S.price); last.c = S.price;
+  return k;
+}
+function marketCalc() {
+  const k = k15Live(); if (k.length < 30 || !S.price) return null;
+  const p = S.price, n = k.length, now = Date.now();
+  const sumD = m => { let s = 0; for (let i = Math.max(0, n - m); i < n; i++) { if (k[i].tb == null) return null; s += 2 * k[i].tb - k[i].v; } return s; };
+  let pv = 0, vv = 0;
+  for (let i = Math.max(0, n - 96); i < n; i++) { pv += (k[i].h + k[i].l + k[i].c) / 3 * k[i].v; vv += k[i].v; }
+  const atr = atrSeries(k.slice(0, -1)), r = [];
+  for (let i = Math.max(1, n - 193); i < n - 1; i++) r.push(Math.log(k[i].c / k[i - 1].c));
+  const mu = r.reduce((a, b) => a + b, 0) / r.length, s15 = Math.sqrt(r.reduce((a, b) => a + (b - mu) ** 2, 0) / (r.length - 1));
+  const ch = m => n > m ? (p / k[n - 1 - m].c - 1) * 100 : null;
+  let histEnd = 0; if (S.hist) for (const t of S.hist.oi.keys()) histEnd = Math.max(histEnd, t + T15);
+  const oiNow = S.oiSrc === 'binance' ? S.bnOIraw : S.oi;
+  const oiCh = ms => {
+    if (!S.hist || !oiNow) return null;
+    const t0 = now - ms; let s = 0;
+    for (const [t, d] of S.hist.oi) if (t >= t0) s += d;
+    for (const m of S.liveMinutes) if (m.t >= Math.max(t0, histEnd) && m.dOI) s += m.dOI;
+    return s / oiNow * 100;
+  };
+  return { k, last: k[n - 1], prev: k[n - 2], cvd: { h1: sumD(4), h4: sumD(16), h24: sumD(96) }, vwap: vv > 0 ? pv / vv : null, atr: atr[atr.length - 1], s15, ch1h: ch(4), ch4h: ch(16), ch24h: ch(96), oi1: oiCh(3600e3), oi4: oiCh(4 * 3600e3), oi24: oiCh(DAY) };
+}
+
+/* ================= Which comes first: up level vs down level ================= */
+// Brownian motion in log-price. Neutral: P(up first) = ln(p/dn) / ln(up/dn).
+// With drift μ (per day) and volatility σ (per day): P(up first) = (1 − e^{2μb/σ²}) / (e^{−2μa/σ²} − e^{2μb/σ²}),
+// a = ln(up/p), b = ln(p/dn). Expected time to hit either (neutral) = a·b/σ² days.
+function hitFirst(p, up, dn, sigDay, muDay) {
+  if (!(up > p) || !(dn < p) || !(sigDay > 0)) return null;
+  const a = Math.log(up / p), b = Math.log(p / dn), s2 = sigDay * sigDay, neutral = b / (a + b);
+  let trend = neutral;
+  if (muDay && Math.abs(muDay) > 1e-6) {
+    const k = 2 * muDay / s2, num = 1 - Math.exp(k * b), den = Math.exp(-k * a) - Math.exp(k * b);
+    if (isFinite(num / den)) trend = Math.min(1, Math.max(0, num / den));
+  }
+  return { neutral, trend, etaDays: a * b / s2 };
+}
+function fmtEta(days) { const m = days * 1440; return m < 60 ? Math.max(1, Math.round(m)) + ' min' : m < 2880 ? (m / 60).toFixed(m < 600 ? 1 : 0) + ' h' : (m / 1440).toFixed(1) + ' d'; }
+function renderFirst() {
+  const p = S.price; if (!p) return;
+  const sig = S.sigma || (S.mc && S.mc.s15 * Math.sqrt(96)); if (!sig) return;
+  const p24 = priceAgo(DAY), mu = p24 ? Math.log(p / p24) : 0;
+  const W = S.walls, v = S.views.D, mc = S.mc, o = S.optView, rows = [];
+  if (W && W.bigAsk && W.bigBid) rows.push(['Biggest sell wall vs biggest buy wall', 'SELL WALL', W.bigAsk.lvl, `${fmtUsd(W.bigAsk.usd)} ask`, 'BUY WALL', W.bigBid.lvl, `${fmtUsd(W.bigBid.usd)} bid`]);
+  if (W && W.nearAsk && W.nearBid && (W.nearAsk !== W.bigAsk || W.nearBid !== W.bigBid)) rows.push(['Nearest strong sell wall vs strong buy wall (≥3× median)', 'SELL WALL', W.nearAsk.lvl, `${fmtUsd(W.nearAsk.usd)} ask`, 'BUY WALL', W.nearBid.lvl, `${fmtUsd(W.nearBid.usd)} bid`]);
+  if (v && v.tA && v.tB) rows.push(['Shorts liquidation target vs longs liquidation target (1-day map)', 'SHORTS BOX', v.tA.edge, `${fmtUsd(v.tA.value)} est.`, 'LONGS BOX', v.tB.edge, `${fmtUsd(v.tB.value)} est.`]);
+  if (v && v.ladA && v.ladB) rows.push(['Cascade ladder start above vs below', 'LADDER ↑', v.ladA.from, `${fmtUsd(v.ladA.usd)} to $${fmtPx(v.ladA.to, 0)}`, 'LADDER ↓', v.ladB.from, `${fmtUsd(v.ladB.usd)} to $${fmtPx(v.ladB.to, 0)}`]);
+  if (mc && mc.last.h > p && mc.last.l < p) rows.push(["Break this 15-min candle's high vs low", 'CANDLE HIGH', mc.last.h, 'current candle', 'CANDLE LOW', mc.last.l, 'current candle']);
+  if (mc && mc.vwap && mc.atr) rows.push(['±1 ATR (15-min) from here', '+1 ATR', p + mc.atr, `ATR ${fmtPx(mc.atr)}`, '−1 ATR', p - mc.atr, 'symmetric control']);
+  if (o && o.cw && o.pw && o.cw.k > p && o.pw.k < p && o.cw.k / p < 1.25 && o.pw.k / p > 0.75) rows.push(['Options call wall vs put wall', 'CALL WALL', o.cw.k, fmtEth(o.cw.c), 'PUT WALL', o.pw.k, fmtEth(o.pw.p)]);
+  const html = rows.map(([title, uN, up, uS, dN, dn, dS]) => {
+    const h = hitFirst(p, up, dn, sig, mu); if (!h) return '';
+    const u = Math.round(h.neutral * 100), d = 100 - u, ut = Math.round(h.trend * 100);
+    return `<div class="fb-row"><div class="fb-t">${title}</div>` +
+      `<div class="fb-lbl"><span class="pos">▲ ${uN} $${fmtPx(up, up < 100 ? 2 : 0)} (${fmtPct((up / p - 1) * 100)}) · ${uS}</span><span class="neg">${dN} $${fmtPx(dn, dn < 100 ? 2 : 0)} (${fmtPct((dn / p - 1) * 100)}) · ${dS} ▼</span></div>` +
+      `<div class="fb-bar"><div class="u" style="width:${u}%">${u}%</div><div class="d" style="width:${d}%">${d}%</div></div>` +
+      `<div class="fb-s">trend-adjusted (24 h drift ${fmtPct(mu * 100)}): up first <b class="pos">${ut}%</b> · down first <b class="neg">${100 - ut}%</b> · typical time until one is hit ≈ ${fmtEta(h.etaDays)}</div></div>`;
+  }).join('');
+  $('firstBoard').innerHTML = html || '<span class="muted">Waiting for walls / liquidation targets…</span>';
+  S.firstTop = rows.length ? (() => { const r = rows[0], h = hitFirst(p, r[2], r[5], sig, mu); return h ? { title: r[0], up: r[2], dn: r[5], u: h.neutral, t: h.trend } : null; })() : null;
+}
+
+/* ================= 15-min candle target ================= */
+S.ct = { cur: null, n: 0, hit: 0 };
+function candleTarget(mc) {
+  const p = S.price, last = mc.last, now = Date.now();
+  const end = last.t + T15, rem = Math.max(5000, end - now), days = rem / DAY;
+  const sigDay = mc.s15 * Math.sqrt(96), sRem = mc.s15 * Math.sqrt(rem / T15);
+  const pT = px => Math.min(1, 2 * (1 - normCdf(Math.abs(Math.log(px / p)) / (sigDay * Math.sqrt(days)))));
+  const bands = { s1: [p * Math.exp(-sRem), p * Math.exp(sRem)], s2: [p * Math.exp(-2 * sRem), p * Math.exp(2 * sRem)] };
+  // bias: simple signed votes (shown to the user)
+  const votes = [];
+  votes.push(['candle so far', last.c > last.o ? 1 : last.c < last.o ? -1 : 0, last.c >= last.o ? 'green' : 'red']);
+  if (mc.cvd.h1 != null) votes.push(['CVD 1 h (taker delta)', mc.cvd.h1 > 0 ? 1 : -1, (mc.cvd.h1 > 0 ? '+' : '') + fmtEth(mc.cvd.h1)]);
+  const rr = wilderRsi(mc.k.map(x => x.c)), rN = rr[rr.length - 1], rP = rr[rr.length - 2];
+  votes.push(['15m RSI direction', rN > rP ? 1 : -1, `${rP.toFixed(1)} → ${rN.toFixed(1)}`]);
+  const W = S.walls;
+  if (W && (W.imb1.b + W.imb1.a) > 0) { const q = W.imb1.b / Math.max(1, W.imb1.a); votes.push(['book ±1% (bids/asks)', q > 1.2 ? 1 : q < 1 / 1.2 ? -1 : 0, q.toFixed(2)]); }
+  const v = S.views.D;
+  const nb = v && v.clB.slice().sort((a, b) => b.end - a.end)[0], na = v && v.clA.slice().sort((a, b) => a.start - b.start)[0];
+  if (nb && na) votes.push(['nearer liquidity box', Math.abs(na.dist) < Math.abs(nb.dist) ? 1 : -1, Math.abs(na.dist) < Math.abs(nb.dist) ? 'shorts above' : 'longs below']);
+  if (S.setup && S.setup.side) votes.push(['15-min setup', S.setup.side === 'L' ? 2 : -2, S.setup.signal]);
+  const score = votes.reduce((a, x) => a + x[1], 0);
+  const dir = score >= 2 ? 1 : score <= -2 ? -1 : 0;
+  // levels within reach (±3%)
+  const lv = [];
+  const L = (name, px, kind) => { if (px > 0 && Math.abs(px / p - 1) <= 0.03 && Math.abs(px - p) > 0.01) lv.push({ name, px, kind }); };
+  L('Previous candle high', mc.prev.h, 'c'); L('Previous candle low', mc.prev.l, 'c');
+  if (last.h > p) L('This candle high', last.h, 'c'); if (last.l < p) L('This candle low', last.l, 'c');
+  if (mc.atr) { L('Open + 1 ATR (typical range)', last.o + mc.atr, 'a'); L('Open − 1 ATR (typical range)', last.o - mc.atr, 'a'); }
+  if (mc.vwap) L('VWAP 24 h', mc.vwap, 'v');
+  if (W) { if (W.bigAsk) L(`Sell wall ${fmtUsd(W.bigAsk.usd)}`, W.bigAsk.lvl, 'w'); if (W.bigBid) L(`Buy wall ${fmtUsd(W.bigBid.usd)}`, W.bigBid.lvl, 'w');
+    if (W.nearAsk && W.nearAsk !== W.bigAsk) L(`Strong ask ${fmtUsd(W.nearAsk.usd)}`, W.nearAsk.lvl, 'w'); if (W.nearBid && W.nearBid !== W.bigBid) L(`Strong bid ${fmtUsd(W.nearBid.usd)}`, W.nearBid.lvl, 'w'); }
+  if (na) L(`Shorts liq. box ${fmtUsd(na.value)}`, na.edge, 'l'); if (nb) L(`Longs liq. box ${fmtUsd(nb.value)}`, nb.edge, 'l');
+  if (v && v.ladA) L('Cascade ladder ↑ start', v.ladA.from, 'l'); if (v && v.ladB) L('Cascade ladder ↓ start', v.ladB.from, 'l');
+  for (const x of lv) { x.dist = (x.px / p - 1) * 100; x.prob = pT(x.px); }
+  lv.sort((a, b) => b.px - a.px);
+  let target = null, inval = null, hf = null;
+  if (dir && mc.atr) {
+    const minMove = 0.25 * mc.atr;
+    const cands = lv.filter(x => dir > 0 ? x.px >= p + minMove : x.px <= p - minMove).sort((a, b) => Math.abs(a.dist) - Math.abs(b.dist));
+    target = cands.find(x => x.prob >= 0.15) || cands[0] || { name: '0.75 ATR projection', px: p + dir * 0.75 * mc.atr };
+    target.prob = pT(target.px);
+    inval = dir > 0 ? Math.min(last.l, p - 0.35 * mc.atr) : Math.max(last.h, p + 0.35 * mc.atr);
+    if (dir > 0 && inval >= p) inval = p - 0.35 * mc.atr;
+    if (dir < 0 && inval <= p) inval = p + 0.35 * mc.atr;
+    hf = dir > 0 ? hitFirst(p, target.px, inval, sigDay, 0) : hitFirst(p, inval, target.px, sigDay, 0);
+  }
+  return { last, end, rem, bands, votes, score, dir, lv, target, inval, pTargetFirst: hf ? (dir > 0 ? hf.neutral : 1 - hf.neutral) : null };
+}
+function renderCandle() {
+  const mc = S.mc; if (!mc) { $('candleHead').textContent = 'Waiting for 15-min candles…'; return; }
+  const ct = candleTarget(mc); S.ctNow = ct;
+  const p = S.price, now = Date.now();
+  // lock one target per candle and score it at the close (session stats, honest hit rate)
+  const cur = S.ct.cur;
+  if (cur && cur.t !== ct.last.t) {
+    S.ct.n++; if (cur.hit) S.ct.hit++;
+    logEvent(cur.dir > 0 ? 'up' : 'down', `15-min target ${cur.hit ? '<b>HIT ✔</b>' : 'missed ✘'}: $${fmtPx(cur.px)} (${cur.dir > 0 ? 'up' : 'down'}) for the ${new Date(cur.t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} candle · session ${S.ct.hit}/${S.ct.n}.`);
+    S.ct.cur = null;
+  }
+  if (!S.ct.cur && ct.target && ct.rem > 60000) S.ct.cur = { t: ct.last.t, px: ct.target.px, dir: ct.dir, hit: false };
+  if (S.ct.cur && !S.ct.cur.hit && (S.ct.cur.dir > 0 ? p >= S.ct.cur.px : p <= S.ct.cur.px)) S.ct.cur.hit = true;
+  const mm = Math.floor(ct.rem / 60000), ss = Math.floor(ct.rem % 60000 / 1000);
+  const head = $('candleHead');
+  head.className = 'setup-sig ' + (ct.dir > 0 ? 'up' : ct.dir < 0 ? 'down' : 'neutral');
+  head.innerHTML = ct.target
+    ? `${ct.dir > 0 ? '▲ TARGET UP' : '▼ TARGET DOWN'} $${fmtPx(ct.target.px)} (${fmtPct((ct.target.px / p - 1) * 100)})<small>${esc(ct.target.name)} · touch before close ${fmtProb(ct.target.prob)} · reaches target before $${fmtPx(ct.inval)} ${fmtProb(ct.pTargetFirst)} · bias score ${ct.score > 0 ? '+' : ''}${ct.score} · closes in ${mm}:${String(ss).padStart(2, '0')}</small>`
+    : `NO CLEAR TARGET · bias score ${ct.score > 0 ? '+' : ''}${ct.score}<small>needs ±2 · expected close range (68%) $${fmtPx(ct.bands.s1[0])}–${fmtPx(ct.bands.s1[1])} · closes in ${mm}:${String(ss).padStart(2, '0')}</small>`;
+  $('candleLevels').innerHTML = ct.lv.map(x => `<tr class="${ct.target && x.px === ct.target.px ? 'tgt' : ''}"><td>${esc(x.name)}</td><td>$${fmtPx(x.px)}</td><td class="${x.dist > 0 ? 'pos' : 'neg'}">${fmtPct(x.dist)}</td><td><b>${fmtProb(x.prob)}</b></td></tr>`).join('') || '<tr><td colspan="4" class="muted">No levels within ±3%.</td></tr>';
+  $('candleStats').innerHTML = `Votes: ${ct.votes.map(([n, s, t]) => `${n} <b class="${s > 0 ? 'pos' : s < 0 ? 'neg' : ''}">${s > 0 ? '+' + s : s}</b> (${esc(t)})`).join(' · ')}.<br>` +
+    `Expected close range: 68% $${fmtPx(ct.bands.s1[0])}–${fmtPx(ct.bands.s1[1])} · 95% $${fmtPx(ct.bands.s2[0])}–${fmtPx(ct.bands.s2[1])} · ATR(14) ${fmtPx(mc.atr)} · session targets hit ${S.ct.hit}/${S.ct.n}. Touch chances come from 15-min volatility, not direction.`;
+  drawCandleChart(mc, ct);
+}
+function drawCandleChart(mc, ct) {
+  const c0 = setupCanvas($('cvCandle')); if (!c0) return;
+  const { ctx, W, H } = c0;
+  const ks = mc.k.slice(-30), padL = 6, padR = 66, top = 18, bot = H - 20;
+  const nSlots = ks.length + 2, cw = (W - padL - padR) / nSlots;
+  let lo = Infinity, hi = 0;
+  for (const k of ks.slice(-16)) { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h); }
+  lo = Math.min(lo, ct.bands.s2[0]); hi = Math.max(hi, ct.bands.s2[1]);
+  if (ct.target) { lo = Math.min(lo, ct.target.px, ct.inval); hi = Math.max(hi, ct.target.px, ct.inval); }
+  for (const k of ks) { lo = Math.min(lo, k.l); hi = Math.max(hi, k.h); }
+  const padP = (hi - lo) * 0.06; lo -= padP; hi += padP;
+  const Y = px => bot - (px - lo) / (hi - lo) * (bot - top);
+  const X = i => padL + i * cw;
+  // projection bands for the rest of this candle
+  const xl = X(ks.length - 1), xr = X(ks.length + 1.6);
+  ctx.fillStyle = 'rgba(96,165,250,0.08)'; ctx.fillRect(xl, Y(ct.bands.s2[1]), xr - xl, Y(ct.bands.s2[0]) - Y(ct.bands.s2[1]));
+  ctx.fillStyle = 'rgba(96,165,250,0.16)'; ctx.fillRect(xl, Y(ct.bands.s1[1]), xr - xl, Y(ct.bands.s1[0]) - Y(ct.bands.s1[1]));
+  // horizontal levels
+  const hline = (px, color, dash, label, w) => {
+    if (!(px > lo && px < hi)) return;
+    const y = Math.round(Y(px)) + 0.5;
+    ctx.strokeStyle = color; ctx.lineWidth = w || 1; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = color; ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(label, W - padR + 4, y + 3.5);
+  };
+  if (mc.vwap) hline(mc.vwap, '#c084fc', [2, 3], 'VWAP');
+  const Wl = S.walls;
+  if (Wl && Wl.bigAsk) hline(Wl.bigAsk.lvl, '#fb923c', [], 'sell wall');
+  if (Wl && Wl.bigBid) hline(Wl.bigBid.lvl, '#60a5fa', [], 'buy wall');
+  const v = S.views.D;
+  if (v && v.tA) hline(v.tA.edge, '#22c55e', [5, 4], 'shorts box');
+  if (v && v.tB) hline(v.tB.edge, '#ef4444', [5, 4], 'longs box');
+  if (ct.target) { hline(ct.inval, '#94a3b8', [3, 3], 'invalid.'); hline(ct.target.px, ct.dir > 0 ? '#4ade80' : '#f87171', [], 'TARGET', 2.2); }
+  // candles
+  ks.forEach((k, i) => {
+    const x = X(i) + cw * 0.5, up = k.c >= k.o, live = i === ks.length - 1;
+    ctx.strokeStyle = ctx.fillStyle = up ? '#22c55e' : '#ef4444';
+    ctx.beginPath(); ctx.moveTo(x, Y(k.h)); ctx.lineTo(x, Y(k.l)); ctx.lineWidth = 1; ctx.stroke();
+    const yb = Y(Math.max(k.o, k.c)), hb = Math.max(1, Math.abs(Y(k.o) - Y(k.c)));
+    if (live) { ctx.lineWidth = 1.5; ctx.strokeRect(x - cw * 0.35, yb, cw * 0.7, hb); ctx.globalAlpha = 0.45; ctx.fillRect(x - cw * 0.35, yb, cw * 0.7, hb); ctx.globalAlpha = 1; }
+    else ctx.fillRect(x - cw * 0.35, yb, cw * 0.7, hb);
+  });
+  // arrow from price to target
+  if (ct.target) {
+    const x = X(ks.length - 1) + cw * 0.5, x2 = X(ks.length + 1.2);
+    ctx.strokeStyle = ctx.fillStyle = ct.dir > 0 ? '#4ade80' : '#f87171'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, Y(S.price)); ctx.lineTo(x2, Y(ct.target.px)); ctx.stroke();
+    const yt = Y(ct.target.px); ctx.beginPath(); ctx.arc(x2, yt, 4, 0, Math.PI * 2); ctx.fill();
+  }
+  // price tag + countdown
+  const yp = Y(S.price);
+  ctx.fillStyle = '#f1f5f9'; ctx.fillRect(W - padR, yp - 8, padR, 16);
+  ctx.fillStyle = '#0b1020'; ctx.font = 'bold 10.5px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.fillText(fmtPx(S.price, 1), W - padR + 3, yp + 4);
+  ctx.fillStyle = '#94a3b8'; ctx.font = '10.5px system-ui,sans-serif';
+  const mm = Math.floor(ct.rem / 60000), ss = Math.floor(ct.rem % 60000 / 1000);
+  ctx.fillText(`15-min · closes in ${mm}:${String(ss).padStart(2, '0')} · shaded = expected close range 68% / 95%`, padL + 2, 12);
+  ctx.textAlign = 'center';
+  for (let i = 0; i < ks.length; i += 6) ctx.fillText(new Date(ks[i].t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), X(i) + cw / 2, H - 5);
+}
+
 /* ================= Tooltips ================= */
 function placeTip(tip, ev) {
   tip.style.display = 'block';
@@ -2146,6 +2452,7 @@ function startDemo() {
   computeSigma(); rebuild(); S.histReady = true;
   const walk = (n, vol) => { let x = p; const a = [x]; for (let i = 1; i < n; i++) { x /= Math.exp(gauss() * vol); a.unshift(x); } return a; };
   S.rsi = { '1w': walk(200, 0.07), '1d': walk(200, 0.03), '4h': walk(200, 0.012), '15m': candles.slice(-200).map(c => c.c) };
+  S.k15 = candles.slice(-200).map(c => { const v = 2000 + rnd() * 6000; return Object.assign({}, c, { v, tb: v * (c.c >= c.o ? 0.52 + rnd() * 0.08 : 0.4 + rnd() * 0.08) }); });
   S.stats = { funding: 0.000083, nextFunding: now + 3.2 * 3600e3, mark: p, index: p * 0.9997, lsAcc: { longAccount: '0.64', shortAccount: '0.36', longShortRatio: '1.78' }, lsTop: { longAccount: '0.58', shortAccount: '0.42', longShortRatio: '1.38' }, taker: { buySellRatio: '1.07', buyVol: '12500', sellVol: '11680' } };
   S.byFunding = 0.0001; S.byNextFunding = now + 3.2 * 3600e3;
   // simulated options: 6 expiries, strikes every $50
@@ -2175,6 +2482,10 @@ function startDemo() {
     }
     const bp = Math.floor(np * (1 - 0.004 - rnd() * 0.01) / 10) * 10, ap = Math.ceil(np * (1 + 0.004 + rnd() * 0.01) / 10) * 10;
     if (rnd() < 0.1 || !S.book.bid) S.book = { bid: { px: bp, usd: 4e6 + rnd() * 8e6 }, ask: { px: ap, usd: 4e6 + rnd() * 8e6 } };
+    if (rnd() < 0.1 || !S.hlLevels) {
+      const lv = dir => Array.from({ length: 20 }, (_, i) => { const px = Math.round(np / 10) * 10 + dir * (i + 1) * 10; return [px, (0.5 + rnd() * 3) * 1e6 * (rnd() < 0.1 ? 4 : 1)]; });
+      S.hlLevels = { bids: lv(-1), asks: lv(1), t: Date.now() };
+    }
   }, 500);
   setInterval(render, 1000);
   render();
@@ -2195,6 +2506,7 @@ async function init() {
   loadStats(); setInterval(loadStats, 60000);
   loadOptions(); setInterval(loadOptions, 120000);
   setTimeout(scanCoins, 4000); setInterval(scanCoins, 300000);
+  loadBooks(); setInterval(loadBooks, 15000);
   setInterval(render, 1000);
   await loadHistory();
   setInterval(loadHistory, 30 * 60000);
