@@ -227,7 +227,7 @@ button:hover{background:#273449}
 </head>
 <body>
 <header>
-  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v7 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
+  <div class="brand"><h1>ETH Liquidity Radar <span class="ver">v8 · 26 Nov 2026</span></h1><span class="sub">ETHUSDT perpetual · <b>estimated</b> liquidation maps (model, not real positions) · ETH options open interest</span></div>
   <div class="px"><span id="price">—</span><small id="pxsrc"></small></div>
   <div class="dots" id="dots">
     <span class="dot" id="dot-bnrest" title="waiting"><i></i>Binance REST</span>
@@ -244,7 +244,7 @@ button:hover{background:#273449}
   <div id="status" class="status neutral">NEUTRAL</div>
   <div id="statusDetail">Loading history…</div>
   <label class="chk"><input type="checkbox" id="sound"> sound (cascades only)</label>
-  <label class="chk"><input type="checkbox" id="focus"> focus: pop-ups only for ≥80% signals + cascades</label>
+  <label class="chk"><input type="checkbox" id="focus"> focus: pop-ups only for high-confidence signals + cascades</label>
   <label class="chk"><input type="checkbox" id="soundAll"> sound on every alert</label>
   <label class="chk"><input type="checkbox" id="notify"> desktop notification</label>
   <label class="chk"><input type="checkbox" id="vibrate"> vibrate (phone)</label>
@@ -258,7 +258,7 @@ button:hover{background:#273449}
 <div id="edgeGlow" class="edge"></div>
 
 <section class="card sigcard">
-  <div class="hhead"><h2>Direction signal · next 30 min</h2><span class="d">shows LONG / SHORT only when the model's chance ≥ your threshold (Settings, default 80%) · model output, not investment advice</span></div>
+  <div class="hhead"><h2>Direction signal · next 30 min</h2><span class="d">shows LONG / SHORT only when the model's chance ≥ your threshold (Settings, default 60%) · model output, not investment advice</span></div>
   <div id="sigHead" class="sig-main neutral">Training model…</div>
   <div id="sigMeters" class="sig-meters"></div>
   <div id="sigInfo" class="muted" style="font-size:11.5px;margin-top:6px"></div>
@@ -397,7 +397,7 @@ const T15 = 900000;
 const DAY = 864e5;
 const HEAT_SPAN = 3 * DAY;
 const CFG_KEY = 'ethLiqRadar.v2';
-const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 80, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
+const DEFAULTS = { mult: 2.5, mm: 0.5, weights: [15, 25, 25, 20, 15], sound: false, notify: false, vibrate: true, wake: false, soundAll: false, focus: true, sigThr: 60, cfgVer: 8, armDist: 0.5, cascadeMin: 200, cascadeModel: 2, burstMin: 250, sweepMin: 1, liqMin: 2, capDist: 1.2, appDist: 0.6, mode: 'total', cum: true, optExp: 'all', optRange: 30 };
 const VIEWS = [
   { id: 'D', R: 0.06, H: DAY, T: 1, cv: 'cvD', sum: 'sumD', label: '1 day' },
   { id: 'W', R: 0.12, H: 7 * DAY, T: 7, cv: 'cvW', sum: 'sumW', label: '1 week' }
@@ -417,6 +417,7 @@ function loadCfg() {
     if (s) {
       const c = Object.assign(defaults(), JSON.parse(s));
       if (!Array.isArray(c.weights) || c.weights.length !== 5) c.weights = DEFAULTS.weights.slice();
+      if ((JSON.parse(s).cfgVer || 0) < 8) { c.sigThr = 60; c.cfgVer = 8; }   // v8: signal threshold moved to 60% for everyone once
       return c;
     }
   } catch (e) { /* storage unavailable */ }
